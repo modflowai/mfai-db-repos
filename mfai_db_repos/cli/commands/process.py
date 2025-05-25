@@ -87,10 +87,10 @@ def repository(
     REQUIRED: You must specify EITHER --repo-url OR --repo-id.
     
     Examples:
-      python -m gitcontext.cli.main process repository --repo-url https://github.com/example/repo.git
-      python -m gitcontext.cli.main process repository --repo-id 1 --limit 20
-      python -m gitcontext.cli.main process repository --repo-url https://github.com/example/repo.git --include-tests
-      python -m gitcontext.cli.main process repository --repo-url https://github.com/example/private-repo.git --github-token YOUR_TOKEN
+      python -m mfai_db_repos.cli.main process repository --repo-url https://github.com/example/repo.git
+      python -m mfai_db_repos.cli.main process repository --repo-id 1 --limit 20
+      python -m mfai_db_repos.cli.main process repository --repo-url https://github.com/example/repo.git --include-tests
+      python -m mfai_db_repos.cli.main process repository --repo-url https://github.com/example/private-repo.git --github-token YOUR_TOKEN
     
     This command will:
     1. Clone/update the repository if needed
@@ -120,14 +120,14 @@ def repository(
     if not repo_url and not repo_id:
         click.echo("Error: Either --repo-url or --repo-id must be specified.")
         click.echo("\nExamples:")
-        click.echo("  python -m gitcontext.cli.main process repository --repo-url https://github.com/example/repo.git")
-        click.echo("  python -m gitcontext.cli.main process repository --repo-id 1")
-        click.echo("\nRun 'python -m gitcontext.cli.main process repository --help' for more information.")
+        click.echo("  python -m mfai_db_repos.cli.main process repository --repo-url https://github.com/example/repo.git")
+        click.echo("  python -m mfai_db_repos.cli.main process repository --repo-id 1")
+        click.echo("\nRun 'python -m mfai_db_repos.cli.main process repository --help' for more information.")
         return
     
     # Set GitHub token in configuration if provided
     if github_token:
-        from gitcontext.utils.config import config
+        from mfai_db_repos.utils.config import config
         config.update(**{"git.github_token": github_token})
         click.echo(f"Using provided GitHub token for authentication")
     

@@ -190,6 +190,9 @@ python -m mfai_db_repos.cli.main process repository --repo-url https://github.co
 
 # Include test files and directories (excluded by default)
 python -m mfai_db_repos.cli.main process repository --repo-url https://github.com/example/repo.git --include-tests
+
+# Include README context for better file analysis
+python -m mfai_db_repos.cli.main process repository --repo-url https://github.com/example/repo.git --include-readme
 ```
 
 The processing utilizes parallel execution to maximize efficiency:
@@ -212,6 +215,28 @@ The repository processing command performs a complete workflow:
    - AI analysis with the Gemini model (with retry logic)
    - Embedding generation with OpenAI
    - Storage in the database
+
+#### README Context Integration
+
+The system includes an advanced README context integration feature that significantly improves file analysis accuracy by providing the AI with project context when analyzing individual files.
+
+**Usage:**
+```bash
+# Enable README context integration
+python -m mfai_db_repos.cli.main process repository --repo-url https://github.com/example/repo.git --include-readme
+```
+
+**How it works:**
+- README content is extracted once at the beginning of repository processing
+- The README (up to 15,000 characters) is included as context for every file analysis
+- File content is limited to 45,000 characters when README is included (vs 60,000 without)
+- The AI uses this context to better understand the project's purpose and architecture
+
+**Benefits:**
+- **Better Understanding**: AI knows what the overall project does before analyzing files
+- **Architecture Awareness**: Understands how individual files fit into the project structure
+- **Improved Analysis**: More accurate titles, summaries, and keyword extraction
+- **Relationship Context**: Better identification of how components relate to each other
 
 ### Repository Management
 

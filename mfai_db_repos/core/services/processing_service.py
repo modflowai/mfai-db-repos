@@ -611,7 +611,7 @@ class RepositoryProcessingService:
                     commit_hash = git_repo.get_file_commit_hash(file_path)
                     
                     # Generate structured analysis using Google Gemini with retry logic
-                    max_retries = 3
+                    max_retries = 10
                     retry_delay = 2  # Initial delay in seconds
                     
                     for retry_attempt in range(max_retries):

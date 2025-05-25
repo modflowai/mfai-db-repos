@@ -92,7 +92,7 @@ async def init_database_extensions() -> Tuple[bool, str]:
     """
     try:
         # Import here to avoid circular imports
-        from gitcontext.lib.database.connection import get_engine
+        from mfai_db_repos.lib.database.connection import get_engine
         
         # Create pgvector extension if it doesn't exist
         async with get_engine().begin() as conn:

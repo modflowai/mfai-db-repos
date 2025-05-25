@@ -233,7 +233,7 @@ class RepositoryService:
             return 0
         
         # Use file processor to process files
-        from gitcontext.lib.file_processor.processor import FileProcessor
+        from mfai_db_repos.lib.file_processor.processor import FileProcessor
         
         processor = FileProcessor()
         

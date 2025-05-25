@@ -81,7 +81,7 @@ def add_repository(
     
     # Set GitHub token in configuration if provided
     if github_token:
-        from gitcontext.utils.config import config
+        from mfai_db_repos.utils.config import config
         config.update(**{"git.github_token": github_token})
         console.print(f"Using provided GitHub token for authentication")
     
@@ -310,7 +310,7 @@ def update_repository(repository_id: int, process: bool, verbose: bool, github_t
     
     # Set GitHub token in configuration if provided
     if github_token:
-        from gitcontext.utils.config import config
+        from mfai_db_repos.utils.config import config
         config.update(**{"git.github_token": github_token})
         console.print(f"Using provided GitHub token for authentication")
     

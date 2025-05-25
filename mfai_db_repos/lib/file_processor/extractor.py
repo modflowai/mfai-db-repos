@@ -193,7 +193,7 @@ class FileExtractor:
         filepath = str(Path(filepath))
         
         # Use config patterns if not provided
-        from gitcontext.utils.config import config
+        from mfai_db_repos.utils.config import config
         file_filter_config = config.config.file_filter
         
         # Use config patterns if not provided

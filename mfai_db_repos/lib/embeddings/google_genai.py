@@ -222,7 +222,7 @@ class GoogleGenAIEmbeddingProvider(EmbeddingProvider):
 """
             
             # Truncate file content if it's too long (adjust based on README presence)
-            max_chars = 45000 if readme_content else 60000  # Leave room for README content
+            max_chars = 485000 if readme_content else 500000  # Leave room for README content (500k - 15k)
             if len(content) > max_chars:
                 logger.warning(f"File content truncated from {len(content)} to {max_chars} characters for analysis")
                 content = content[:max_chars]
