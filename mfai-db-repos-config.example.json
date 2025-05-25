@@ -1,0 +1,44 @@
+{
+  "database": {
+    "host": "localhost",
+    "port": 5437,
+    "user": "postgres",
+    "password": "postgres",
+    "database": "gitcontext",
+    "poolsize": 5,
+    "connect_timeout": 30
+  },
+  "embedding": {
+    "openai_api_key": null,
+    "openai_model": "text-embedding-3-small",
+    "google_genai_api_key": null,
+    "gemini_model": "gemini-2.5-flash-preview-05-20",
+    "embedding_dimensions": 1536,
+    "parallel_workers": 5,
+    "max_content_length": 60000,
+    "batch_size": 5
+  },
+  "git": {
+    "default_clone_path": "~/.gitcontext/repositories",
+    "default_branch": "main",
+    "depth": 1
+  },
+  "file_filter": {
+    "include_patterns": [
+      "**/*.py",
+      "**/*.md",
+      "**/*.txt"
+    ],
+    "exclude_patterns": [
+      "**/.git/**",
+      "**/node_modules/**",
+      "**/__pycache__/**",
+      "**/.pytest_cache/**",
+      "**/venv/**",
+      "**/.venv/**"
+    ],
+    "max_file_size_mb": 10.0
+  },
+  "log_level": "INFO",
+  "log_file": null
+}

@@ -1,0 +1,5 @@
+To use local PostgreSQL Docker:
+cp .env.local .env
+
+To use Neon DB:
+cp .env.neon .env
