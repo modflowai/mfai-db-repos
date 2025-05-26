@@ -119,7 +119,7 @@ class RepositoryProcessingService:
         # Create Google GenAI config
         google_config = GoogleGenAIEmbeddingConfig(
             api_key=google_api_key,
-            model="gemini-2.5-flash-preview-05-20",  # Default model
+            model="gemini-2.0-flash",  # Default model - better for structured output with LaTeX
             batch_size=1,  # Process one file at a time for analysis
             max_parallel_requests=self.parallel_workers
         )
@@ -734,11 +734,18 @@ class RepositoryProcessingService:
         tasks = [process_single_file(file_path, i) for i, file_path in enumerate(file_paths)]
         file_results = await asyncio.gather(*tasks)
         
-        # Filter out None results (failed files)
-        processed_files = [result for result in file_results if result is not None]
+        # Filter out None results and track failed files
+        processed_files = []
+        failed_file_paths = []
+        
+        for i, result in enumerate(file_results):
+            if result is not None:
+                processed_files.append(result)
+            else:
+                failed_file_paths.append(file_paths[i])
         
         success_count = len(processed_files)
-        failure_count = len(file_paths) - success_count
+        failure_count = len(failed_file_paths)
         
         # Save all processed files in a single transaction
         if processed_files:
@@ -761,7 +768,7 @@ class RepositoryProcessingService:
                     # Verify repository exists
                     if not repository:
                         logger.error(f"Repository with ID {repo_id} not found when saving files")
-                        return (0, len(file_paths))
+                        return (0, len(file_paths), file_paths)
                     
                     # Create and add new files
                     for file_data in processed_files:
@@ -812,9 +819,10 @@ class RepositoryProcessingService:
                     # Count all files as failures
                     failure_count = len(file_paths)
                     success_count = 0
+                    failed_file_paths = file_paths
         
         logger.info(f"Batch {batch_index+1}/{total_batches} completed: {success_count} succeeded, {failure_count} failed")
-        return (success_count, failure_count)
+        return (success_count, failure_count, failed_file_paths)
     
     async def process_repository(
         self,
@@ -824,7 +832,7 @@ class RepositoryProcessingService:
         limit: Optional[int] = None,
         include_tests: bool = False,
         include_readme: bool = False,
-    ) -> Tuple[int, int]:
+    ) -> Tuple[int, int, List[str]]:
         """
         Process a repository with the complete workflow.
         
@@ -837,16 +845,17 @@ class RepositoryProcessingService:
             include_readme: Whether to include README.md content in file analysis (default: False)
             
         Returns:
-            Tuple of (success_count, failure_count)
+            Tuple of (success_count, failure_count, failed_files_list)
         """
         total_success = 0
         total_failure = 0
+        failed_files = []
         
         # Get or create repository
         if repo_url:
             repo_info = await self.get_or_create_repository(repo_url, branch)
             if not repo_info:
-                return (0, 0)
+                return (0, 0, [])
             repo_id, git_repo = repo_info
         elif repo_id:
             # Get existing repository
@@ -856,14 +865,14 @@ class RepositoryProcessingService:
                 
                 if not repository:
                     logger.error(f"Repository with ID {repo_id} not found")
-                    return (0, 0)
+                    return (0, 0, [])
                 
                 # Initialize Git repository
                 git_repo = GitRepository(repository.url, repository.clone_path, repository.default_branch)
                 
                 if not git_repo.is_cloned():
                     logger.error(f"Repository is not cloned. Please clone it first.")
-                    return (0, 0)
+                    return (0, 0, [])
                 
                 # Get the actual branch name
                 actual_branch = git_repo.get_current_branch()
@@ -878,7 +887,7 @@ class RepositoryProcessingService:
                 await repo_repo.update_status(repo_id, RepoStatus.INDEXING.value)
         else:
             logger.error("Either repo_url or repo_id must be specified")
-            return (0, 0)
+            return (0, 0, [])
         
         # Extract README content if requested
         readme_content = None
@@ -897,7 +906,7 @@ class RepositoryProcessingService:
         
         if not file_paths:
             logger.info(f"No files found for repository ID {repo_id}")
-            return (0, 0)
+            return (0, 0, [])
         
         total_files = len(file_paths)
         logger.info(f"Found {total_files} files to process")
@@ -931,9 +940,10 @@ class RepositoryProcessingService:
         batch_results = await asyncio.gather(*batch_tasks)
         
         # Process results
-        for i, (batch_success, batch_failure) in enumerate(batch_results):
+        for i, (batch_success, batch_failure, batch_failed_files) in enumerate(batch_results):
             total_success += batch_success
             total_failure += batch_failure
+            failed_files.extend(batch_failed_files)
             
             logger.info(f"Completed batch {i+1}/{total_batches}: {batch_success} succeeded, {batch_failure} failed")
             
@@ -954,4 +964,11 @@ class RepositoryProcessingService:
                 await repo_repo.update(repository)
         
         logger.info(f"Repository processing completed: {total_success} succeeded, {total_failure} failed")
-        return (total_success, total_failure)
+        
+        # Log failed files if any
+        if failed_files:
+            logger.info("\nFailed files:")
+            for failed_file in failed_files:
+                logger.info(f"  - {failed_file}")
+        
+        return (total_success, total_failure, failed_files)

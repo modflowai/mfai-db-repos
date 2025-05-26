@@ -38,7 +38,7 @@ class EmbeddingConfig(BaseModel):
     gemini_model: str = Field(default="gemini-2.5-flash-preview-05-20")
     embedding_dimensions: int = Field(default=1536)
     parallel_workers: int = Field(default=5)
-    max_content_length: int = Field(default=60000)
+    max_content_length: int = Field(default=1000000)
     batch_size: int = Field(default=20)
 
 
@@ -57,6 +57,8 @@ class FileFilterConfig(BaseModel):
     include_patterns: list[str] = Field(default=[
         # Python files
         "**/*.py", 
+        # Jupyter notebooks
+        "**/*.ipynb",
         # Documentation
         "**/*.md", "**/*.txt", 
         # TypeScript files

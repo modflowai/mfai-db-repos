@@ -4,6 +4,27 @@ This roadmap outlines the development plan for rebuilding GitContext as a Python
 
 ## Changelog
 
+### 2025-05-26
+- **Fixed JSON Parsing Issues**: Resolved persistent JSON validation errors when processing complex code files
+  - Implemented base64 encoding for content transmission to handle escape sequences
+  - Switched from JSON to custom delimited format (===SECTION===) for Gemini responses
+  - Created robust parsing logic for extracting structured data
+- **Removed Fallback Values**: Eliminated all fallback values to enable proper error debugging
+  - System now fails explicitly when critical fields cannot be extracted
+  - Enables identification of problematic content patterns
+- **Enhanced Domain Awareness**: Updated analysis prompts for scientific computing domains
+  - Optimized for groundwater modeling (MODFLOW), parameter estimation (PEST), and technical documentation
+  - Analysis now considers diverse audiences: scientists, engineers, modelers, researchers
+  - Improved potential question generation for RAG applications
+- **Improved Error Reporting**: Added detailed failed file tracking
+  - Processing now reports specific file paths that failed
+  - Helps identify patterns in processing failures
+- **Configuration Updates**:
+  - Increased retry attempts from 3 to 10 for API resilience
+  - Increased content limits from 60k to 500k characters
+  - Added .ipynb files to default processing patterns
+  - Switched from Gemini 2.5 Flash Preview to Gemini 2.0 Flash for stability
+
 ### 2025-05-17
 - Created Python virtual environment (.venv)
 - Set up uv Python environment with pip
@@ -191,6 +212,17 @@ This roadmap outlines the development plan for rebuilding GitContext as a Python
 - ✅ **Database Storage**: Implemented efficient storage of repositories, files, content, and vector embeddings
 
 ### Current Issues
+- **File Processing Failures**: Some files still fail processing and require specific handling:
+  - Data files with unusual formats (e.g., `.txt` files in `examples/data/`)
+  - Empty `__init__.py` files in certain directories
+  - Files with extremely complex escape sequences or binary-like content
+  - Example failed files from flopy repository:
+    - `examples/data/mt3d_example_sft_lkt_uzt/lak_arrays/bdlknc.txt`
+    - `examples/data/mt3d_example_sft_lkt_uzt/bas_arrays/strthd[1-3].txt`
+    - `examples/data/mt3d_example_sft_lkt_uzt/bas_arrays/ibnd_lay1.txt`
+    - `flopy/mf6/coordinates/__init__.py`
+    - `autotest/__init__.py`
+    - `autotest/regression/__init__.py`
 - Implement vector-based similarity search using pgvector
 - Add full support for PostgreSQL full-text search with tsvector
 - Improve performance for large repositories with better filtering techniques

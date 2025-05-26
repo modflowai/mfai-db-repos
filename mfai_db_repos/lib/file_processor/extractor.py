@@ -97,7 +97,7 @@ class FileExtractor:
             max_content_length: Maximum content length in characters
         """
         self.max_file_size_bytes = (max_file_size_mb or get_float_env("MAX_FILE_SIZE_MB", 10)) * 1024 * 1024
-        self.max_content_length = max_content_length or 60000  # Default to 60K characters
+        self.max_content_length = max_content_length or 1000000  # Default to 1M characters
 
     def get_file_type(self, filepath: Union[str, Path]) -> str:
         """Determine the file type based on extension and content.

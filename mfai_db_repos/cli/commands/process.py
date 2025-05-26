@@ -137,7 +137,7 @@ def repository(
     # Process repository
     try:
         click.echo("Starting repository processing...")
-        success, failure = asyncio.run(service.process_repository(
+        success, failure, failed_files = asyncio.run(service.process_repository(
             repo_url=repo_url,
             repo_id=repo_id,
             branch=branch,
@@ -150,6 +150,12 @@ def repository(
         click.echo("\nProcessing complete!")
         click.echo(f"Successfully processed: {success} files")
         click.echo(f"Failed to process: {failure} files")
+        
+        # Print failed files if any
+        if failed_files:
+            click.echo("\nFailed files:")
+            for failed_file in failed_files:
+                click.echo(f"  - {failed_file}")
         
     except KeyboardInterrupt:
         click.echo("\nOperation cancelled by user")

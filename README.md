@@ -1,25 +1,36 @@
 # mfai_db_repos Python
 
-A repository processing system built with Python and PostgreSQL that provides a fast, efficient CLI tool for cloning Git repositories, analyzing their contents, and storing them in a structured database with vector embeddings.
+A repository processing system built with Python and PostgreSQL that provides a fast, efficient CLI tool for cloning Git repositories, analyzing their contents, and storing them in a structured database with vector embeddings. Designed for building RAG (Retrieval-Augmented Generation) systems for scientific and technical documentation.
 
 ```bash
 # Process a Git repository with a single command:
 python -m mfai_db_repos.cli.main process repository --repo-url https://github.com/username/repository.git
 ```
 
+✨ **Recent Updates**: 
+- **Robust JSON Processing**: Resolved complex escape sequence handling in code analysis with base64 encoding and custom parsing
+- **Domain-Aware Analysis**: Optimized for scientific computing, groundwater modeling, and parameter estimation domains
+- **Enhanced Error Reporting**: Removed fallbacks to enable proper debugging of analysis failures
+- **Failed File Tracking**: Detailed reporting of which files failed processing and why
+
 ✨ **New Feature**: mfai_db_repos now supports [Neon DB](https://neon.tech/) for serverless PostgreSQL deployments, enabling scalable cloud-based operation without managing your own database server.
 
 ## Features
 
-- Repository cloning and indexing using GitPython
-- Automatic support for private repositories with GitHub token
-- Content storage in PostgreSQL with pgvector
-- Serverless database support with Neon DB
-- Vector embeddings generation with OpenAI
-- Structured content analysis with Google's Gemini model
-- Configurable file type selection and filtering
-- File metadata extraction and indexing
-- Command-line interface for repository management
+- **Repository Processing**: Clone and index Git repositories with comprehensive file analysis
+- **Scientific Domain Support**: Optimized for groundwater modeling (MODFLOW 6, MODFLOW-USG), parameter estimation (PEST++, PEST), and scientific computing
+- **Robust Analysis Pipeline**: 
+  - Base64 encoding for complex code with escape sequences
+  - Custom parsing format to avoid JSON validation issues
+  - Domain-aware content analysis considering diverse technical audiences
+  - No fallback values - proper error tracking for debugging
+- **AI-Powered Analysis**: Google Gemini for structured content analysis with scientific domain awareness
+- **Vector Embeddings**: OpenAI embeddings for semantic search and RAG applications
+- **Database Support**: PostgreSQL with pgvector extension, including serverless Neon DB support
+- **Private Repository Support**: Automatic GitHub token handling for private repositories
+- **Configurable Processing**: File type filtering, batch processing, and parallel execution
+- **Comprehensive CLI**: Full command-line interface for all operations
+- **Failed File Tracking**: Detailed reporting of processing failures with specific file paths
 
 ## Installation
 
@@ -210,11 +221,24 @@ The repository processing command performs a complete workflow:
 1. Loads the repository (either from the database if it exists or clones it if needed)
 2. Extracts all files from the repository
 3. Processes each file in parallel batches with:
-   - Content extraction
+   - Content extraction and base64 encoding for safe transmission
    - Git metadata extraction
-   - AI analysis with the Gemini model (with retry logic)
-   - Embedding generation with OpenAI
-   - Storage in the database
+   - AI analysis with Gemini model using custom parsing format
+   - Domain-aware analysis considering scientific/technical audiences
+   - Retry logic with exponential backoff (up to 10 attempts)
+   - OpenAI embedding generation for semantic search
+   - Atomic database storage per batch
+
+#### Processing Robustness
+
+The system includes several robustness improvements:
+
+- **Base64 Content Encoding**: All file content is base64-encoded before analysis to handle complex escape sequences and special characters safely
+- **Custom Response Format**: Uses delimited format (===SECTION===) instead of JSON to avoid parsing issues with code content
+- **No Fallback Values**: System fails explicitly when critical fields (potential_questions, keywords, etc.) cannot be extracted, enabling proper debugging
+- **Failed File Tracking**: Detailed logging and reporting of which specific files failed processing
+- **Domain-Aware Analysis**: Prompts optimized for scientific computing, groundwater modeling, and parameter estimation domains
+- **Increased Retry Logic**: Up to 10 retry attempts with exponential backoff for transient API failures
 
 #### README Context Integration
 
