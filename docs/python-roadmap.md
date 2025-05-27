@@ -270,3 +270,4 @@ This roadmap outlines the development plan for rebuilding GitContext as a Python
   - Add file type filters to search tools
   - Consider dedicated `get_readme` tool
   - Store README content in repository metadata
+- Implement incremental update system for repositories
