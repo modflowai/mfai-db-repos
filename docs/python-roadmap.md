@@ -4,6 +4,21 @@ This roadmap outlines the development plan for rebuilding GitContext as a Python
 
 ## Changelog
 
+### 2025-05-27
+- **Added Single File Update Feature**: Implemented functionality to update individual files without reprocessing entire repositories
+  - Created `update_single_file()` method in RepositoryProcessingService
+  - Added new CLI command `process file` for targeted file updates
+  - Particularly useful for updating README.md files with TOCs
+  - Enables efficient documentation updates without full repository reprocessing
+- **Discovered README Search Challenge**: Found that README files are difficult to find with standard search tools
+  - FTS and vector search are optimized for content within files, not overview documents
+  - Led to new insights about needing specialized tools for documentation discovery
+- **Developed Hybrid README Rebuilding Strategy**: Created more efficient approach for rebuilding comprehensive READMEs
+  - Combines direct file access with existing database analysis
+  - Avoids search tool limitations while leveraging AI analysis already done
+  - Uses extraction script to get summaries, concepts, and questions from database
+  - Synthesizes perfect READMEs with navigation guides and search hints
+
 ### 2025-05-26
 - **Fixed JSON Parsing Issues**: Resolved persistent JSON validation errors when processing complex code files
   - Implemented base64 encoding for content transmission to handle escape sequences
@@ -245,6 +260,16 @@ This roadmap outlines the development plan for rebuilding GitContext as a Python
   - ✅ Process files in consistent batches of 5
   - ✅ Add proper error handling and transaction management
   - ✅ Use environment variables (.env) for configuration
+- ✅ Implement single file update functionality for efficient documentation updates
+- Implement hybrid README rebuilding system:
+  - Create extraction script to get analysis data from database
+  - Build comprehensive READMEs using file structure + AI analysis
+  - Generate navigation guides and search hints
+  - Update READMEs using single file update feature
+- Enhance MCP tools based on discoveries:
+  - Add file type filters to search tools
+  - Consider dedicated `get_readme` tool
+  - Store README content in repository metadata
 - Implement vector-based similarity search using pgvector extension
 - Add CLI commands for semantic searches using embeddings
 - Create visualization for repository file relationships based on embedding similarity

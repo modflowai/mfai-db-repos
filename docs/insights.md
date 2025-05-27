@@ -443,7 +443,60 @@ CREATE TABLE query_success_patterns (
 
 This transforms the MCP tools from simple search interfaces into an intelligent navigation system that understands the domain and guides users to the right information efficiently.
 
+### Important Discovery: README Search Challenge
+
+During testing, we discovered that README files are particularly difficult to find using standard FTS and vector search tools because:
+
+- **FTS (Full-Text Search)** looks for exact text matches within files
+- **Vector search** looks for semantic similarity in the content
+- README files often contain project names and descriptions that might not match common search terms
+
+This is actually a great insight for improving the MCP tools - we might need a specific tool or search method for finding README files or documentation overview files, since they serve a special purpose in understanding repositories. Potential solutions:
+
+1. **Add a file type filter** to search tools (e.g., `file_type='documentation'` or `filename='README.md'`)
+2. **Create a dedicated tool** like `get_readme` that retrieves README content for a specific repository
+3. **Index README content differently** with higher weight for repository overview searches
+4. **Store README content in the repository metadata** for quick access without searching
+
 ## Building the Enhanced Database: An Iterative Approach
+
+### The Hybrid README Rebuilding Strategy
+
+A more efficient approach has emerged: instead of using MCP tools to search for content, we can use a hybrid approach that combines direct file access with existing database analysis.
+
+#### The Hybrid Approach Components:
+
+1. **Direct File Access** - Copy repository files locally for direct reading
+2. **Database Analysis Extraction** - Query existing AI-generated analysis from the database
+3. **Synthesis Script** - Combine file structure with analysis data to build perfect READMEs
+
+#### Benefits:
+- **No search limitations** - Direct access to all files
+- **Leverages existing work** - Uses AI analysis already in the database
+- **Structure-aware** - Understands actual file organization
+- **Efficient** - No reprocessing of content needed
+
+#### The README Building Process:
+
+1. **Copy repository files locally** → Direct access to structure and content
+2. **Extract analysis from database** → Get all summaries, concepts, questions
+3. **Synthesize comprehensive README** with:
+   - Overview synthesized from all file summaries
+   - TOC based on actual file structure
+   - Key concepts index from analysis data
+   - Common questions aggregated from all files
+   - Search guidance based on file types
+   - Integration points from keyword analysis
+
+#### Required Script:
+```python
+# get_repo_analysis.py
+async def get_repository_analysis(repo_id: int) -> Dict:
+    """Extract all analysis data for README generation."""
+    # Returns: repository info, file analyses, statistics
+```
+
+This approach avoids the limitations of search tools while maximizing the value of existing processed data.
 
 ### The Three-Phase Bootstrap Strategy
 
