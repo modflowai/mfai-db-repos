@@ -230,11 +230,11 @@ This enhanced database architecture will enable:
 
 ### Technical Considerations
 
-- **Vector Embeddings**: Expand beyond 1536 dimensions for richer semantic understanding
-- **Graph Database**: Consider Neo4j for complex relationship queries
+- **Vector Embeddings**: Current 1536 dimensions are sufficient for semantic understanding
+- **Database Architecture**: PostgreSQL with pgvector + JSON columns handles all relationship needs perfectly
 - **Real-time Updates**: Implement webhooks for repository changes
 - **Caching Strategy**: Use Redis for frequently accessed concepts and workflows
-- **API Design**: GraphQL for flexible querying of interconnected data
+- **API Design**: RESTful API with rich JSON responses for structured data
 
 ### Measuring Success
 
@@ -442,3 +442,141 @@ CREATE TABLE query_success_patterns (
 ```
 
 This transforms the MCP tools from simple search interfaces into an intelligent navigation system that understands the domain and guides users to the right information efficiently.
+
+## Building the Enhanced Database: An Iterative Approach
+
+### The Three-Phase Bootstrap Strategy
+
+Rather than building everything at once, we use an iterative approach that leverages existing tools to build enhanced capabilities:
+
+#### Phase 0: Initial Tool Enhancement (Immediate)
+**Goal**: Make current tools slightly smarter to help build the enhanced database
+
+1. **Enhance tool descriptions** with better guidance
+2. **Add basic query pattern detection** to tool responses
+3. **Include file metadata** in search results (file_type, extension, repo context)
+4. **Return structured JSON** with more context
+
+These minimal changes enable us to use the tools effectively for Phase 1.
+
+#### Phase 1: Build Enhanced Metadata Using Current Tools (Days 1-7)
+**Goal**: Use the improved tools to extract and build the enhanced database columns
+
+1. **Build Repository READMEs**
+   - Use `modflow_ai_mcp_00_list_repos` to get all repositories
+   - For each repo, use `modflow_ai_mcp_00_repo_search` to find key documentation files
+   - Use `modflow_ai_mcp_00_vec` to extract conceptual summaries
+   - Compile comprehensive READMEs with navigation guides
+
+2. **Extract Capability Fingerprints**
+   - Search for patterns: "is used for", "designed to", "enables"
+   - Identify input/output formats from file extensions
+   - Find integration points by searching for other tool names
+   - Build expertise keyword lists from high-frequency terms
+
+3. **Identify Query Patterns**
+   - Analyze documentation for common question formats
+   - Extract parameter naming conventions (UPPERCASE patterns)
+   - Find error message formats (quoted strings)
+   - Identify workflow patterns ("steps to", "how to", "procedure")
+
+4. **Map Repository Relationships**
+   - Search for cross-references between repositories
+   - Find import statements and dependencies
+   - Identify shared file formats
+   - Document common workflows across tools
+
+**Key Insight**: We use the MCP tools themselves to mine the documentation and build the enhanced metadata.
+
+#### Phase 2: Database Enhancement & Tool Evolution (Days 8-14)
+**Goal**: Update database with extracted metadata and evolve tools to use it
+
+1. **Database Updates**
+   ```sql
+   -- Add extracted metadata to existing tables
+   ALTER TABLE repositories 
+     ADD COLUMN readme_content TEXT,
+     ADD COLUMN readme_metadata JSON,
+     ADD COLUMN capability_fingerprint JSON,
+     ADD COLUMN expertise_keywords JSON,
+     ADD COLUMN search_guidance JSON;
+   
+   -- Create pattern tracking
+   CREATE TABLE query_patterns (
+     pattern_type VARCHAR(50),
+     pattern_regex TEXT,
+     recommended_tool VARCHAR(50),
+     recommended_repo VARCHAR(255)
+   );
+   ```
+
+2. **Tool Evolution**
+   - Transform `repo_list` → `repo_navigator` with rich summaries
+   - Enhance search results with navigation context
+   - Add suggested next searches based on patterns
+   - Include README section references in results
+
+### The Bootstrap Workflow
+
+```
+Current Tools → Extract Metadata → Enhance Database → Evolve Tools → Better Experience
+     ↑                                                                         ↓
+     └────────────────── Continuous Improvement Loop ←────────────────────────┘
+```
+
+### Practical Extraction Examples
+
+#### Using Current Tools to Build Capability Fingerprints:
+
+1. **Find Primary Purpose**
+   ```
+   Tool: modflow_ai_mcp_00_repo_search
+   Query: "introduction overview purpose"
+   Extract: First substantive paragraph
+   ```
+
+2. **Identify Key Concepts**
+   ```
+   Tool: modflow_ai_mcp_00_fts
+   Query: Repository-specific terms (iterate through files)
+   Extract: High-frequency technical terms
+   ```
+
+3. **Discover Integration Points**
+   ```
+   Tool: modflow_ai_mcp_00_vec
+   Query: "works with compatible interface"
+   Extract: References to other tools
+   ```
+
+#### Pattern Mining Strategy:
+
+1. **Error Patterns**
+   - Search for: "error:", "warning:", "failed"
+   - Extract quoted strings following these keywords
+   - Build error pattern database
+
+2. **Parameter Patterns**
+   - Search for: all-caps words with underscores
+   - Extract from input specification files
+   - Create parameter naming conventions
+
+3. **Workflow Patterns**
+   - Search for: numbered lists, "step 1", "procedure"
+   - Extract structured workflows
+   - Build workflow templates
+
+### Success Metrics for Each Phase
+
+**Phase 0 Success**: Tools return enough context to enable metadata extraction
+**Phase 1 Success**: Complete capability fingerprints for all repositories
+**Phase 2 Success**: Tools automatically guide users to optimal search strategies
+
+### The Beauty of This Approach
+
+1. **No Manual Documentation Writing**: Everything is extracted from existing content
+2. **Tools Build Tools**: We use current capabilities to create enhanced capabilities  
+3. **Iterative Improvement**: Each phase makes the next phase easier
+4. **Immediate Value**: Even Phase 0 improvements help users right away
+
+This bootstrap approach means we don't need to build everything at once - we can start improving the system today using what we already have.
