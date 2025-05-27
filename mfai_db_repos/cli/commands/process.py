@@ -164,3 +164,82 @@ def repository(
         click.echo(f"\nError: {str(e)}")
         if verbose:
             click.echo(traceback.format_exc())
+
+
+@process.command()
+@click.option(
+    "--repo-id",
+    help="Repository ID where the file exists",
+    type=int,
+    required=True,
+    metavar="ID",
+)
+@click.option(
+    "--filepath", 
+    help="Path to the file relative to repository root (e.g., README.md)",
+    type=str,
+    required=True,
+    metavar="PATH",
+)
+@click.option(
+    "--include-readme",
+    help="Include repository README.md content in file analysis for better context",
+    is_flag=True,
+)
+@click.option(
+    "--verbose", "-v",
+    help="Enable verbose logging",
+    is_flag=True,
+)
+def file(
+    repo_id: int,
+    filepath: str,
+    include_readme: bool = False,
+    verbose: bool = False,
+):
+    """Update a single file in an existing repository.
+    
+    This command is useful for updating individual files without reprocessing
+    the entire repository. Perfect for updating README.md files or other
+    documentation that changes frequently.
+    
+    Examples:
+      python -m mfai_db_repos.cli.main process file --repo-id 1 --filepath README.md
+      python -m mfai_db_repos.cli.main process file --repo-id 2 --filepath docs/guide.md --include-readme
+    
+    This command will:
+    1. Pull latest changes from the repository
+    2. Extract the specified file content
+    3. Regenerate analysis and embeddings
+    4. Update the existing database record (or create if new)
+    """
+    # Set up logging
+    log_level = "DEBUG" if verbose else "INFO"
+    setup_logging(level=log_level)
+    
+    # Create processing service
+    service = RepositoryProcessingService()
+    
+    # Process the single file
+    try:
+        click.echo(f"Updating file '{filepath}' in repository ID {repo_id}...")
+        
+        success = asyncio.run(service.update_single_file(
+            repo_id=repo_id,
+            filepath=filepath,
+            include_readme=include_readme,
+        ))
+        
+        if success:
+            click.echo(f"\n✅ Successfully updated file: {filepath}")
+        else:
+            click.echo(f"\n❌ Failed to update file: {filepath}")
+            click.echo("Check the logs for more details.")
+            
+    except KeyboardInterrupt:
+        click.echo("\nOperation cancelled by user")
+    except Exception as e:
+        import traceback
+        click.echo(f"\nError: {str(e)}")
+        if verbose:
+            click.echo(traceback.format_exc())

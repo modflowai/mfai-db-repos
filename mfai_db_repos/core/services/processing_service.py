@@ -972,3 +972,118 @@ class RepositoryProcessingService:
                 logger.info(f"  - {failed_file}")
         
         return (total_success, total_failure, failed_files)
+    
+    async def update_single_file(
+        self,
+        repo_id: int,
+        filepath: str,
+        include_readme: bool = False,
+    ) -> bool:
+        """
+        Update a single file in an existing repository.
+        
+        Args:
+            repo_id: Repository ID
+            filepath: Path to the file relative to repository root (e.g., "README.md")
+            include_readme: Whether to include README.md content in file analysis
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        # Get repository
+        async with session_context() as session:
+            repo_repo = RepositoryRepository(session)
+            repository = await repo_repo.get_by_id(repo_id)
+            
+            if not repository:
+                logger.error(f"Repository with ID {repo_id} not found")
+                return False
+            
+            # Initialize Git repository
+            git_repo = GitRepository(repository.url, repository.clone_path, repository.default_branch)
+            
+            if not git_repo.is_cloned():
+                logger.error(f"Repository is not cloned. Please clone it first.")
+                return False
+            
+            # Update repository to get latest changes
+            success, changed_files = git_repo.update()
+            if not success:
+                logger.error(f"Failed to update repository")
+                return False
+            
+            logger.info(f"Repository updated successfully")
+        
+        # Check if file exists in repository
+        repo_path = Path(git_repo.repo.working_dir)
+        full_path = repo_path / filepath
+        
+        if not full_path.exists():
+            logger.error(f"File {filepath} not found in repository")
+            return False
+        
+        # Extract README content if requested and it's not the file being updated
+        readme_content = None
+        if include_readme and filepath.lower() != "readme.md":
+            readme_content = await self.extract_readme_content(git_repo)
+            if readme_content:
+                logger.info("README.md content extracted for context")
+        
+        # Create embedding manager
+        embedding_manager = await self.create_embedding_manager()
+        
+        # Process the single file
+        logger.info(f"Processing file: {filepath}")
+        
+        try:
+            # Process the file
+            repo_file = await self.process_file(
+                filepath,
+                repo_id,
+                git_repo,
+                embedding_manager,
+                readme_content
+            )
+            
+            if not repo_file:
+                logger.error(f"Failed to process file {filepath}")
+                return False
+            
+            # Save or update the file in database
+            async with session_context() as session:
+                file_repo = RepositoryFileRepository(session)
+                
+                # Check if file already exists
+                existing_file = await file_repo.get_by_path(repo_id, filepath)
+                
+                if existing_file:
+                    logger.info(f"Updating existing file: {filepath}")
+                    # Update existing file with new data
+                    existing_file.content = repo_file.content
+                    existing_file.embedding = repo_file.embedding
+                    existing_file.embedding_string = repo_file.embedding_string
+                    existing_file.analysis = repo_file.analysis
+                    existing_file.tags = repo_file.tags
+                    existing_file.file_type = repo_file.file_type
+                    existing_file.technical_level = repo_file.technical_level
+                    existing_file.file_size = repo_file.file_size
+                    existing_file.last_modified = repo_file.last_modified
+                    existing_file.repo_commit_hash = repo_file.repo_commit_hash
+                    existing_file.indexed_at = datetime.utcnow()
+                    
+                    # Save changes
+                    await file_repo.update(existing_file)
+                else:
+                    logger.info(f"Creating new file: {filepath}")
+                    # Add new file
+                    session.add(repo_file)
+                    await session.commit()
+                
+                logger.info(f"Successfully updated file: {filepath}")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Error updating file {filepath}: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return False

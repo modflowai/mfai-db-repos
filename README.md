@@ -206,6 +206,35 @@ python -m mfai_db_repos.cli.main process repository --repo-url https://github.co
 python -m mfai_db_repos.cli.main process repository --repo-url https://github.com/example/repo.git --include-readme
 ```
 
+#### Update Single File
+
+Update individual files without reprocessing the entire repository:
+
+```bash
+# Update README.md in repository with ID 1
+python -m mfai_db_repos.cli.main process file --repo-id 1 --filepath README.md
+
+# Update a documentation file with README context
+python -m mfai_db_repos.cli.main process file --repo-id 2 --filepath docs/guide.md --include-readme
+
+# Update with verbose logging
+python -m mfai_db_repos.cli.main process file --repo-id 1 --filepath README.md -v
+```
+
+This is perfect for:
+- Updating README.md files after adding table of contents
+- Refreshing frequently changing documentation
+- Updating configuration files
+- Processing newly added files
+
+The single file update:
+1. Pulls latest changes from the repository
+2. Verifies the file exists
+3. Regenerates analysis and embeddings
+4. Updates the existing database record (or creates if new)
+
+See [Single File Update Documentation](docs/single-file-update.md) for more details.
+
 The processing utilizes parallel execution to maximize efficiency:
 
 - Multiple files are processed concurrently within each batch
