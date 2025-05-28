@@ -13,6 +13,35 @@ load_env()
 logger = get_logger(__name__)
 
 
+def normalize_file_type(file_type: str) -> str:
+    """Normalize file type to avoid duplicates from inconsistent capitalization."""
+    if not file_type or file_type == 'unknown':
+        return 'unknown'
+    
+    # Convert to lowercase for normalization
+    normalized = file_type.lower()
+    
+    # Consolidate similar terms
+    if 'scientific' in normalized:
+        return 'scientific'
+    elif 'documentation' in normalized or 'doc' in normalized:
+        return 'documentation'
+    elif 'configuration' in normalized or 'config' in normalized:
+        return 'configuration'
+    elif 'tutorial' in normalized:
+        return 'tutorial'
+    elif 'example' in normalized:
+        return 'example'
+    elif 'test' in normalized:
+        return 'test'
+    elif 'data' in normalized:
+        return 'data'
+    elif 'code' in normalized:
+        return 'code'
+    else:
+        return normalized
+
+
 def calculate_repository_type(repo_id: int, conn) -> dict:
     """Calculate repository type based on file extensions and content."""
     
@@ -55,8 +84,9 @@ def calculate_repository_type(repo_id: int, conn) -> dict:
         else:
             file_counts['other'] += 1
         
-        # Count by detected file type
-        file_type_counts[file_type] = file_type_counts.get(file_type, 0) + 1
+        # Count by detected file type (normalize case and consolidate similar terms)
+        normalized_file_type = normalize_file_type(file_type)
+        file_type_counts[normalized_file_type] = file_type_counts.get(normalized_file_type, 0) + 1
         
         # Count by extension
         if ext:
