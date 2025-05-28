@@ -45,7 +45,7 @@ class EmbeddingConfig(BaseModel):
 class GitConfig(BaseModel):
     """Configuration for Git repository operations."""
 
-    default_clone_path: Path = Field(default=Path.home() / ".gitcontext" / "repositories")
+    default_clone_path: Path = Field(default=Path("analyzed_repos"))
     default_branch: str = Field(default="main")
     depth: Optional[int] = Field(default=None)  # None means full clone
     github_token: Optional[str] = Field(default=None)  # GitHub Personal Access Token for private repos

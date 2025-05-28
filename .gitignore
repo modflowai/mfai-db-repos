@@ -51,3 +51,6 @@ mfai-db-repos-config.json
 .env
 .env.local
 .env.neon
+
+# Analyzed repositories
+analyzed_repos/

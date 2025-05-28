@@ -235,6 +235,91 @@ The single file update:
 
 See [Single File Update Documentation](docs/single-file-update.md) for more details.
 
+### README Generation Tool
+
+Generate comprehensive README files for repositories by combining database analysis with file structure:
+
+```bash
+# Generate README for a repository
+python -m mfai_db_repos.tools.readme_builder analyzed_repos/pest --repo-name pest
+
+# Generate README with custom output path
+python -m mfai_db_repos.tools.readme_builder analyzed_repos/flopy --repo-name flopy --output /path/to/README.md
+```
+
+The README builder tool:
+1. Extracts all file analyses from the database
+2. Builds a visual directory tree with file descriptions
+3. Creates topic-based indexes from keywords and concepts
+4. Generates navigation guides and search hints
+5. Compiles common questions from all file analyses
+6. Groups search keywords alphabetically
+
+Features of generated READMEs:
+- **Directory Structure**: Visual tree with inline file descriptions
+- **File Descriptions**: Detailed summaries, key concepts, and metadata
+- **Topic Index**: Files grouped by technical topics
+- **Common Questions**: Aggregated questions the documentation can answer
+- **Search Keywords**: Alphabetically grouped keywords for easy discovery
+
+After generating, update the README in the database:
+```bash
+# Move generated README to repository root
+cd analyzed_repos/pest && mv README_GENERATED.md README.md
+
+# Update in database using single file update
+python -m mfai_db_repos.cli.main process file --repo-id 21 --filepath README.md
+```
+
+### Navigation Guide Generator (MCP Tool Enhancement)
+
+Generate intelligent navigation guides for MCP tools using Gemini 2.5 Pro:
+
+```bash
+# Generate navigation guide from comprehensive README
+python -m mfai_db_repos.tools.navigation_gemini analyzed_repos/pest/README.md pest
+
+# Generate with custom output path
+python -m mfai_db_repos.tools.navigation_gemini analyzed_repos/flopy/README.md flopy --output /path/to/NAVIGATION.md
+```
+
+**Complete Workflow: From Repository to Navigation Intelligence**
+
+1. **Process Repository** → Creates comprehensive file analysis database
+   ```bash
+   python -m mfai_db_repos.cli.main process repository --repo-url https://github.com/modflowai/pest.git --include-readme
+   ```
+
+2. **Generate Comprehensive README** → Aggregates all analysis into detailed documentation
+   ```bash
+   python -m mfai_db_repos.tools.readme_builder analyzed_repos/pest --repo-name pest
+   ```
+
+3. **Generate Navigation Guide** → Uses Gemini to create MCP-optimized navigation from README
+   ```bash
+   python -m mfai_db_repos.tools.navigation_gemini analyzed_repos/pest/README.md pest
+   ```
+
+4. **Store in Database Metadata** → Store navigation guide in repository metadata (single source of truth)
+   ```bash
+   python -m mfai_db_repos.tools.update_repo_metadata pest --navigation-file analyzed_repos/pest/NAVIGATION_FINAL.md
+   ```
+
+**Navigation Guide Features:**
+- **Data-driven**: Analyzed from actual repository content, not hardcoded patterns
+- **MCP-optimized**: Helps LLMs choose FTS vs Vector search intelligently
+- **Specific examples**: Real parameters (NOPTMAX, PHIMLIM) and query patterns
+- **Tool selection logic**: Clear guidance on when to use which search method
+- **Integration context**: Shows how tools work together in workflows
+
+The navigation guide transforms generic search tools into intelligent assistants that understand domain-specific query patterns and repository expertise.
+
+**Key Benefits of Database Storage:**
+- **Single source of truth**: Navigation metadata stored in repository.metadata JSON field
+- **MCP tool access**: Direct database queries for navigation intelligence
+- **Clean file system**: Only README.md needed in repository directory
+- **Automatic population**: Clone path and metadata properly maintained
+
 The processing utilizes parallel execution to maximize efficiency:
 
 - Multiple files are processed concurrently within each batch
@@ -376,6 +461,63 @@ python -m mfai_db_repos.cli.main database remove-repo https://github.com/example
 ```
 
 > **Note**: The `database reset` command only works with local Docker PostgreSQL setups. For Neon DB, you should manage the database through the Neon web interface and use the `database init` command to set up extensions.
+
+### Enhanced Database Reinitialization Workflow
+
+When reprocessing all repositories with enhanced metadata support:
+
+```bash
+# 1. Delete existing tables (manual step for Neon DB)
+# Use Neon web interface or SQL client to drop tables
+
+# 2. Reinitialize database with pgvector
+python -m mfai_db_repos.cli.main database init
+
+# 3. Process repositories with enhanced metadata population
+# The system will now properly populate:
+# - clone_path: 'analyzed_repos/{repo_name}'
+# - metadata: includes navigation_guide, repository_type, file_statistics
+# - repository_type: calculated from file content (code/documentation/hybrid)
+
+# Example complete workflow for a repository:
+python -m mfai_db_repos.cli.main process repository --repo-url https://github.com/modflowai/pest.git --include-readme
+python -m mfai_db_repos.tools.readme_builder analyzed_repos/pest --repo-name pest
+python -m mfai_db_repos.tools.navigation_gemini analyzed_repos/pest/README.md pest
+python -m mfai_db_repos.tools.update_repo_metadata pest --navigation-file analyzed_repos/pest/NAVIGATION_FINAL.md
+```
+
+The enhanced workflow ensures proper population of all database fields, making repositories fully ready for MCP tool integration.
+
+### MCP Repository Preparation (All-in-One Command)
+
+Process a repository with the complete MCP preparation workflow in a single command:
+
+```bash
+# Complete MCP repository preparation
+python -m mfai_db_repos.cli.main mcp prepare --repo-url https://github.com/modflowai/pest.git
+
+# Skip README generation (if you already have one)
+python -m mfai_db_repos.cli.main mcp prepare --repo-url https://github.com/modflowai/pest.git --skip-readme
+
+# Skip navigation generation (if you only want basic processing)
+python -m mfai_db_repos.cli.main mcp prepare --repo-url https://github.com/modflowai/pest.git --skip-navigation
+
+# Verbose mode for debugging
+python -m mfai_db_repos.cli.main mcp prepare --repo-url https://github.com/modflowai/pest.git -v
+```
+
+This single command runs the entire workflow:
+1. **Process repository** with AI analysis and embeddings
+2. **Generate comprehensive README** from all file analyses
+3. **Generate navigation guide** using Gemini 2.5 Pro
+4. **Update repository metadata** with navigation guide and repository type
+
+The command automatically:
+- Extracts repository name from URL
+- Calculates repository type (code/documentation/hybrid)
+- Stores navigation guide in database metadata
+- Cleans up temporary files
+- Provides progress feedback
 
 ### Configuration
 

@@ -226,26 +226,6 @@ This roadmap outlines the development plan for rebuilding GitContext as a Python
 - ✅ **Embedding Generation**: Successfully generates high-quality vector embeddings from structured file analysis
 - ✅ **Database Storage**: Implemented efficient storage of repositories, files, content, and vector embeddings
 
-### Current Issues
-- **File Processing Failures**: Some files still fail processing and require specific handling:
-  - Data files with unusual formats (e.g., `.txt` files in `examples/data/`)
-  - Empty `__init__.py` files in certain directories
-  - Files with extremely complex escape sequences or binary-like content
-  - Example failed files from flopy repository:
-    - `examples/data/mt3d_example_sft_lkt_uzt/lak_arrays/bdlknc.txt`
-    - `examples/data/mt3d_example_sft_lkt_uzt/bas_arrays/strthd[1-3].txt`
-    - `examples/data/mt3d_example_sft_lkt_uzt/bas_arrays/ibnd_lay1.txt`
-    - `flopy/mf6/coordinates/__init__.py`
-    - `autotest/__init__.py`
-    - `autotest/regression/__init__.py`
-- Implement vector-based similarity search using pgvector
-- Add full support for PostgreSQL full-text search with tsvector
-- Improve performance for large repositories with better filtering techniques
-- Add more comprehensive error handling and retry mechanisms for API calls
-- Enhance database connection pooling for better performance
-- Add unit and integration tests for the complete processing pipeline
-- Implement efficient file filtering techniques for huge repositories
-- Add support for incremental updates
 
 ### Next Steps
 - ✅ Refine file filtering to correctly handle .py and .md files
@@ -261,13 +241,132 @@ This roadmap outlines the development plan for rebuilding GitContext as a Python
   - ✅ Add proper error handling and transaction management
   - ✅ Use environment variables (.env) for configuration
 - ✅ Implement single file update functionality for efficient documentation updates
-- Implement hybrid README rebuilding system:
-  - Create extraction script to get analysis data from database
-  - Build comprehensive READMEs using file structure + AI analysis
-  - Generate navigation guides and search hints
-  - Update READMEs using single file update feature
-- Enhance MCP tools based on discoveries:
-  - Add file type filters to search tools
-  - Consider dedicated `get_readme` tool
-  - Store README content in repository metadata
-- Implement incremental update system for repositories
+
+### Phase 4: Navigation Metadata System for MCP Enhancement
+
+**Important Pivot**: We're shifting from building comprehensive documentation to creating concise navigation metadata that enhances MCP tool intelligence. The goal is navigation guides (max 2 pages) that help LLMs choose the right tools and repositories, not detailed documentation.
+
+#### 4.1 Navigation Metadata Builder ✅ (Refined Single-Step Approach)
+
+**Initial Attempt: 2-Step Mechanical + LLM** (Abandoned)
+- ❌ Built mechanical pattern extractor that counted frequencies
+- ❌ Generated poor examples (JCOORDER vs NOPTMAX)
+- ❌ Required hardcoded "known" parameters
+- ❌ Not robust across different repositories
+
+**✅ Final Solution: Direct Gemini Analysis**
+- **✅ Comprehensive README as Input**: Use existing detailed README (500+ lines)
+- **✅ Single Gemini 2.5 Pro Call**: Feed entire README to model for intelligent analysis
+- **✅ Data-Driven Extraction**: Let AI determine importance from actual content
+- **✅ MCP-Optimized Output**: Generate navigation guide specifically for LLM tool selection
+
+**Accomplished:**
+```bash
+# Complete workflow achieved:
+1. python -m mfai_db_repos.cli.main process repository --repo-url URL --include-readme
+2. python -m mfai_db_repos.tools.readme_builder analyzed_repos/pest --repo-name pest
+3. python -m mfai_db_repos.tools.navigation_gemini analyzed_repos/pest/README.md pest
+4. python -m mfai_db_repos.tools.update_repo_metadata pest --navigation-file analyzed_repos/pest/NAVIGATION_FINAL.md
+```
+
+**Key Innovation**: Instead of mechanical pattern extraction, we use the comprehensive README as rich context for Gemini to intelligently extract:
+- Real parameters users search for (NOPTMAX, PHIMLIM, PESTMODE)
+- Actual query patterns from domain expertise
+- Specific tool selection logic (FTS vs Vector)
+- Repository authority rankings with explanations
+- Integration context and workflow tips
+
+**Output**: 85-line navigation guide with actionable intelligence for MCP tools
+
+**✅ Database Integration Completed:**
+- **Clone path properly set**: `analyzed_repos/pest` stored in repositories.clone_path
+- **Navigation in metadata**: 86-line guide stored in repositories.metadata JSON field
+- **Single source of truth**: MCP tools access navigation directly from database
+- **Clean file system**: Only README.md needed per repository
+
+**Final Optimized Workflow** (1 file + database):
+1. Generate `README.md` via readme_builder (comprehensive analysis)
+2. Generate navigation guide via navigation_gemini (temporary file)
+3. Store in database metadata via update_repo_metadata (permanent storage)
+
+**Benefits:**
+- Navigation accessible to MCP tools via database queries
+- No separate navigation files to maintain
+- Proper repository metadata population (clone_path, navigation_guide)
+- Clean separation: README for humans, metadata for AI tools
+
+#### 4.2 Database Schema Enhancements ✅ (Realistic Implementation)
+
+**Fields We Can Actually Populate Now:**
+- **✅ `repository_type`**: 'code' | 'documentation' | 'hybrid' (calculated from file extensions)
+- **✅ Enhanced `metadata` JSON**: Store navigation_guide, repository_type, file_statistics
+- **✅ `readme_content`**: TEXT field for quick README access (future enhancement)
+- **✅ Proper `clone_path`**: Ensure it's populated during processing
+
+**Schema Update for Immediate Implementation:**
+```sql
+-- These fields already exist, just need proper population:
+-- clone_path TEXT (populate with 'analyzed_repos/{name}')
+-- metadata JSON (expand to include navigation guide + stats)
+
+-- Future consideration (not implemented now):
+-- ALTER TABLE repositories ADD COLUMN readme_content TEXT;
+```
+
+**Repository Classification Logic:**
+- Documentation repo: >70% markdown files
+- Code repo: >70% code files (.py, .js, .ts, etc.)
+- Hybrid: Mixed content
+
+**Deferred to Future Phases:**
+- ❌ expertise_scores (needs usage data)
+- ❌ navigation_patterns table (needs tracking over time)
+- ❌ tool_interoperability (needs multi-repo analysis)
+
+#### 4.3 MCP Tool Evolution (TypeScript Codebase)
+- **Transform `repo_list` → `repo_navigator`**:
+  - Return navigation metadata with repository lists
+  - Include expertise scores for intelligent repository selection
+  - Suggest best repository based on query analysis
+  
+- **Enhance Search Result Context**:
+  - Add navigation hints to all search results
+  - Include "why this result" explanations
+  - Suggest next search patterns
+  - Reference relevant navigation guide sections
+
+### Phase 5: Incremental Repository Updates
+
+#### 5.1 Implement Git-Based Change Detection
+- **Track Last Processed Commit**:
+  - Store last processed commit hash in repository metadata
+  - Compare with current HEAD to detect changes
+  - Build list of modified files since last processing
+  
+- **Implement Selective File Processing**:
+  - Process only files that have changed since last update
+  - Handle file additions, modifications, and deletions
+  - Update embeddings only for changed content
+  - Maintain database consistency during incremental updates
+  
+- **Add Incremental Update Command**:
+  - Create `update repository --incremental` CLI command
+  - Show statistics of files added/modified/deleted
+  - Provide option to force full reprocessing if needed
+  - Log incremental update history for debugging
+
+#### 5.2 Optimize for Large Repository Updates
+- **Batch Processing Improvements**:
+  - Detect and group related file changes
+  - Process files in optimal order (dependencies first)
+  - Implement smart batching based on file size and type
+  
+- **Performance Monitoring**:
+  - Track time saved using incremental vs full updates
+  - Monitor API usage reduction from incremental processing
+  - Generate reports on update efficiency
+  
+- **Conflict Resolution**:
+  - Handle cases where database and repository are out of sync
+  - Implement recovery mechanisms for failed partial updates
+  - Add validation checks to ensure data integrity

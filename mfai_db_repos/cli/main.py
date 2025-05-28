@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 from mfai_db_repos.cli.commands import (
     embeddings_group, repositories_group, files_group, process_group, database_group
 )
+from mfai_db_repos.cli.commands.mcp import mcp
 from mfai_db_repos.utils.config import Config
 from mfai_db_repos.utils.logger import setup_logging
 
@@ -56,6 +57,7 @@ cli.add_command(embeddings_group)
 cli.add_command(files_group)
 cli.add_command(process_group)
 cli.add_command(database_group)
+cli.add_command(mcp)
 
 
 @cli.command("config")
