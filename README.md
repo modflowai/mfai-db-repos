@@ -277,7 +277,7 @@ Generate intelligent navigation guides for MCP tools using Gemini 2.5 Pro:
 
 ```bash
 # Generate navigation guide from comprehensive README
-python -m mfai_db_repos.tools.navigation_gemini analyzed_repos/pest/README.md pest
+python -m mfai_db_repos.tools.navigation_gemini analyzed_repos/pest/README_GENERATED.md pest
 
 # Generate with custom output path
 python -m mfai_db_repos.tools.navigation_gemini analyzed_repos/flopy/README.md flopy --output /path/to/NAVIGATION.md
@@ -295,14 +295,14 @@ python -m mfai_db_repos.tools.navigation_gemini analyzed_repos/flopy/README.md f
    python -m mfai_db_repos.tools.readme_builder analyzed_repos/pest --repo-name pest
    ```
 
-3. **Generate Navigation Guide** → Uses Gemini to create MCP-optimized navigation from README
+3. **Generate Navigation Guide** → Uses Gemini to create MCP-optimized navigation from comprehensive README
    ```bash
-   python -m mfai_db_repos.tools.navigation_gemini analyzed_repos/pest/README.md pest
+   python -m mfai_db_repos.tools.navigation_gemini analyzed_repos/pest/README_GENERATED.md pest
    ```
 
 4. **Store in Database Metadata** → Store navigation guide in repository metadata (single source of truth)
    ```bash
-   python -m mfai_db_repos.tools.update_repo_metadata pest --navigation-file analyzed_repos/pest/NAVIGATION_FINAL.md
+   python -m mfai_db_repos.tools.update_repo_metadata pest --navigation-file analyzed_repos/pest/NAVIGATION_GEMINI.md
    ```
 
 **Navigation Guide Features:**
@@ -482,8 +482,8 @@ python -m mfai_db_repos.cli.main database init
 # Example complete workflow for a repository:
 python -m mfai_db_repos.cli.main process repository --repo-url https://github.com/modflowai/pest.git --include-readme
 python -m mfai_db_repos.tools.readme_builder analyzed_repos/pest --repo-name pest
-python -m mfai_db_repos.tools.navigation_gemini analyzed_repos/pest/README.md pest
-python -m mfai_db_repos.tools.update_repo_metadata pest --navigation-file analyzed_repos/pest/NAVIGATION_FINAL.md
+python -m mfai_db_repos.tools.navigation_gemini analyzed_repos/pest/README_GENERATED.md pest
+python -m mfai_db_repos.tools.update_repo_metadata pest --navigation-file analyzed_repos/pest/NAVIGATION_GEMINI.md
 ```
 
 The enhanced workflow ensures proper population of all database fields, making repositories fully ready for MCP tool integration.
@@ -501,6 +501,9 @@ python -m mfai_db_repos.cli.main mcp prepare --repo-url https://github.com/modfl
 
 # Skip navigation generation (if you only want basic processing)
 python -m mfai_db_repos.cli.main mcp prepare --repo-url https://github.com/modflowai/pest.git --skip-navigation
+
+# Keep navigation file in repository directory (default: deleted after storing in database)
+python -m mfai_db_repos.cli.main mcp prepare --repo-url https://github.com/modflowai/pest.git --keep-navigation-file
 
 # Verbose mode for debugging
 python -m mfai_db_repos.cli.main mcp prepare --repo-url https://github.com/modflowai/pest.git -v

@@ -27,8 +27,9 @@ def mcp():
 @click.option("--repo-url", "-u", required=True, help="Repository URL to process")
 @click.option("--skip-readme", is_flag=True, help="Skip README generation")
 @click.option("--skip-navigation", is_flag=True, help="Skip navigation guide generation")
+@click.option("--keep-navigation-file", is_flag=True, help="Keep navigation file in repository directory")
 @click.option("-v", "--verbose", is_flag=True, help="Enable verbose output")
-def prepare(repo_url: str, skip_readme: bool, skip_navigation: bool, verbose: bool):
+def prepare(repo_url: str, skip_readme: bool, skip_navigation: bool, keep_navigation_file: bool, verbose: bool):
     """Complete MCP repository preparation workflow.
     
     This command runs the entire workflow:
@@ -144,10 +145,13 @@ def prepare(repo_url: str, skip_readme: bool, skip_navigation: bool, verbose: bo
                 else:
                     console.print("[green]✓[/green] Repository metadata updated")
                     
-                    # Clean up navigation file since it's now in database
+                    # Clean up navigation file unless user wants to keep it
                     if Path(nav_path).exists():
-                        os.remove(nav_path)
-                        console.print("[dim]  Cleaned up temporary navigation file[/dim]")
+                        if keep_navigation_file:
+                            console.print(f"[dim]  Navigation file kept at: {nav_path}[/dim]")
+                        else:
+                            os.remove(nav_path)
+                            console.print("[dim]  Cleaned up temporary navigation file[/dim]")
     
     # Final summary
     console.print("\n[bold]Summary:[/bold]")
