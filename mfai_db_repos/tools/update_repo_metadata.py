@@ -19,9 +19,9 @@ def calculate_repository_type(repo_id: int, conn) -> dict:
     # Get file statistics from repository files
     result = conn.execute(
         text('''
-            SELECT file_path, language, content_type 
+            SELECT filepath, file_type, extension 
             FROM repository_files 
-            WHERE repository_id = :repo_id
+            WHERE repo_id = :repo_id
         '''),
         {'repo_id': repo_id}
     )
@@ -36,16 +36,16 @@ def calculate_repository_type(repo_id: int, conn) -> dict:
     config_extensions = {'.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf', '.xml'}
     
     file_counts = {'code': 0, 'documentation': 0, 'config': 0, 'other': 0}
-    language_counts = {}
-    content_type_counts = {}
+    file_type_counts = {}
+    extension_counts = {}
     
     for file in files:
-        file_path = file.file_path
-        language = file.language or 'unknown'
-        content_type = file.content_type or 'unknown'
+        filepath = file.filepath
+        file_type = file.file_type or 'unknown'
+        extension = file.extension or ''
         
         # Count by file extension
-        ext = Path(file_path).suffix.lower()
+        ext = extension.lower() if extension else Path(filepath).suffix.lower()
         if ext in code_extensions:
             file_counts['code'] += 1
         elif ext in doc_extensions:
@@ -55,11 +55,12 @@ def calculate_repository_type(repo_id: int, conn) -> dict:
         else:
             file_counts['other'] += 1
         
-        # Count by detected language
-        language_counts[language] = language_counts.get(language, 0) + 1
+        # Count by detected file type
+        file_type_counts[file_type] = file_type_counts.get(file_type, 0) + 1
         
-        # Count by content type
-        content_type_counts[content_type] = content_type_counts.get(content_type, 0) + 1
+        # Count by extension
+        if ext:
+            extension_counts[ext] = extension_counts.get(ext, 0) + 1
     
     total_files = sum(file_counts.values())
     code_ratio = file_counts['code'] / total_files if total_files > 0 else 0
@@ -77,9 +78,9 @@ def calculate_repository_type(repo_id: int, conn) -> dict:
     
     file_stats = {
         'total_files': total_files,
-        'file_type_counts': file_counts,
-        'language_distribution': dict(sorted(language_counts.items(), key=lambda x: x[1], reverse=True)[:10]),
-        'content_type_distribution': dict(sorted(content_type_counts.items(), key=lambda x: x[1], reverse=True)[:10]),
+        'file_category_counts': file_counts,
+        'file_type_distribution': dict(sorted(file_type_counts.items(), key=lambda x: x[1], reverse=True)[:10]),
+        'extension_distribution': dict(sorted(extension_counts.items(), key=lambda x: x[1], reverse=True)[:10]),
         'code_ratio': round(code_ratio, 3),
         'documentation_ratio': round(doc_ratio, 3)
     }
