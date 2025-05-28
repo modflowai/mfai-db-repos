@@ -54,3 +54,7 @@ mfai-db-repos-config.json
 
 # Analyzed repositories
 analyzed_repos/
+
+# MCP server dependencies
+mfai_mcp_server/node_modules/
+mfai_mcp_server/build/

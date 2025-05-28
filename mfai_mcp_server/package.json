@@ -1,0 +1,38 @@
+{
+  "name": "mfai-repository-navigator",
+  "version": "2.0.0",
+  "description": "Intelligent MCP server for navigating and searching groundwater modeling repositories with contextual awareness",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/danilopezmella/mfai-repository-navigator.git"
+  },
+  "keywords": ["mcp", "repository", "navigation", "search", "groundwater", "modflow", "intelligent"],
+  "license": "MIT",
+  "bin": {
+    "mfai-repository-navigator": "./build/index.js"
+  },
+  "main": "./build/index.js",
+  "files": [
+    "build",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "prepare": "npm run build",
+    "watch": "tsc --watch",
+    "dev": "npm run build && node build/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@neondatabase/serverless": "^1.0.0",
+    "openai": "^4.100.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.9",
+    "typescript": "^5.7.2"
+  }
+}
