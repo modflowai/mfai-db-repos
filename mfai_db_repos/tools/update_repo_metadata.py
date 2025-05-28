@@ -126,21 +126,19 @@ def update_repository_metadata(repo_name: str, navigation_file: str = None):
             metadata['navigation_type'] = 'gemini_generated'
             logger.info(f"Read navigation guide from {navigation_file}")
         
-        # Update repository with repository_type field and metadata
+        # Update repository with metadata (repository_type is stored in metadata JSON)
         repo_type = metadata.get('repository_type', 'unknown')
         conn.execute(
             text('''
                 UPDATE repositories 
                 SET clone_path = :clone_path,
                     metadata = :metadata,
-                    repository_type = :repository_type,
                     updated_at = NOW()
                 WHERE id = :repo_id
             '''),
             {
                 'clone_path': clone_path,
                 'metadata': json.dumps(metadata),
-                'repository_type': repo_type,
                 'repo_id': repo_id
             }
         )
