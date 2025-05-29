@@ -63,3 +63,4 @@ mfai_mcp_server/build/
 chatai/node_modules/
 chatai/build/
 .examples/
+tests/mcp_aisdk/node_modules/
