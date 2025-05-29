@@ -1,5 +1,5 @@
 name = "mfai-repository-navigator"
-main = "src/index.ts"
+main = "src/index-sse.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 

@@ -6,17 +6,64 @@ This is the Cloudflare Workers version of the MFAI Repository Navigator MCP serv
 
 - **Stateless Architecture**: Each request is independent, perfect for edge computing
 - **Direct JSON-RPC Handling**: Custom implementation for Cloudflare Workers compatibility
+- **SSE Support**: Server-Sent Events endpoint for Cursor IDE compatibility
+- **Multiple Authentication Strategies**: Bearer tokens, X-API-Key headers, and query parameters
 - **Global Distribution**: Runs on Cloudflare's edge network
 - **Automatic Scaling**: Handles load automatically
 - **Built-in Security**: Cloudflare's security features included
 
-## Important: Cursor IDE Compatibility
+## Cursor IDE Compatibility ✅
 
-**Cursor IDE currently only supports stdio transport, not direct HTTP connections.** This means:
-- You cannot connect Cursor directly to this Cloudflare Worker
-- You must use the included `proxy.js` script as a local bridge
-- The proxy runs locally but all processing happens on Cloudflare
-- Future MCP clients may support direct HTTP connections
+**Great news!** This server now supports multiple connection methods for Cursor IDE:
+
+1. **SSE Endpoint (Recommended)**: Direct connection using mcp-remote with Bearer token authentication
+2. **Local Proxy**: stdio bridge for environments that need it
+
+### Option 1: Direct SSE Connection (Recommended)
+
+Use `mcp-remote` to connect Cursor directly to the Cloudflare Worker:
+
+```json
+{
+  "mcpServers": {
+    "mfai-navigator": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest", 
+        "https://mfai-repository-navigator.little-grass-273a.workers.dev/sse",
+        "--header",
+        "Authorization:Bearer ${MCP_API_KEY}"
+      ],
+      "env": {
+        "MCP_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+**Status: ✅ Tested and Working** - This configuration has been validated with comprehensive testing.
+
+### Option 2: Local Proxy (Alternative)
+
+If you prefer a local bridge:
+
+```json
+{
+  "mcpServers": {
+    "mfai-navigator": {
+      "command": "node",
+      "args": ["/absolute/path/to/proxy.js"],
+      "env": {
+        "MCP_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+**Status: ✅ Tested and Working** - This is the configuration currently working for the user.
 
 ### Understanding the Difference
 
@@ -248,8 +295,8 @@ These clients may support direct HTTP connections in the future:
 - In **test scripts**, we use `MCP_API_KEY` directly: `MCP_API_KEY=your_key node test-prod.js`
 
 **IMPORTANT**: The `MCP_SERVER_AUTH` value must include "Bearer " prefix:
-- ✅ Correct: `"MCP_SERVER_AUTH": "Bearer c12194ba7bd90b7a4183633cfb5ee6251c3db0324b52b456dd43dd2a48c32c86"`
-- ❌ Wrong: `"MCP_SERVER_AUTH": "c12194ba7bd90b7a4183633cfb5ee6251c3db0324b52b456dd43dd2a48c32c86"`
+- ✅ Correct: `"MCP_SERVER_AUTH": "Bearer your_api_key_here"`
+- ❌ Wrong: `"MCP_SERVER_AUTH": "your_api_key_here"`
 
 **Security Tips:**
 - Never commit API keys to Git
@@ -281,16 +328,113 @@ Even with rate limiting, consider:
 3. **Implement request quotas** per API key
 4. **Add CloudFlare's Super Bot Fight Mode**
 
-### 9. Test Production Endpoint
+### 9. Test Production Endpoints
 
-Update the test script with your production URL:
+Test both the HTTP and SSE endpoints:
 
-```javascript
-// In test-local.js, change:
-const baseUrl = 'https://mfai-repository-navigator.little-grass-273a.workers.dev/mcp';
+```bash
+# Test HTTP endpoint
+node test-prod.js
 
-// Then run:
-node test-local.js
+# Test SSE endpoint (requires eventsource package)
+npm install eventsource
+node test-sse-prod.js
+
+# Test with authentication using your API key
+MCP_API_KEY=your_api_key_here node test-sse-prod.js
+```
+
+You can also test the SSE endpoint directly with curl:
+
+```bash
+# Test SSE connection - should show endpoint event
+curl -N -H "Accept: text/event-stream" \
+  -H "Authorization: Bearer your_api_key_here" \
+  https://mfai-repository-navigator.little-grass-273a.workers.dev/sse
+```
+
+**Expected output from curl:**
+```
+event: endpoint
+data: https://mfai-repository-navigator.little-grass-273a.workers.dev/messages
+: ping
+: ping
+...
+```
+
+**Expected output from test-sse-prod.js:**
+```bash
+✅ SSE connection opened
+📡 Received endpoint URL: https://mfai-repository-navigator.little-grass-273a.workers.dev/messages
+  ✅ Initialize response received
+  ✅ Tools list response received
+  ✅ Tool call response received
+  ✅ Bearer token authentication successful
+```
+
+## Test Scripts and Validation
+
+This repository includes comprehensive test scripts to validate both HTTP and SSE endpoints:
+
+### Available Test Scripts
+
+1. **`test-prod.js`** - Tests HTTP endpoint
+2. **`test-sse-prod.js`** - Tests SSE endpoint with full MCP protocol validation
+3. **`test-local.js`** - Tests local development server
+
+### Running Tests
+
+```bash
+# Basic test (no authentication - will show 401 errors)
+node test-sse-prod.js
+
+# Authenticated test with working API key
+MCP_API_KEY=your_api_key_here node test-sse-prod.js
+```
+
+### Expected Test Output
+
+**Successful SSE Test:**
+```bash
+🧪 Starting Production SSE MCP Server Tests
+Testing SSE MCP Server at: https://mfai-repository-navigator.little-grass-273a.workers.dev
+Using API key authentication
+---
+1. Testing health endpoint (/health):
+Health check: {
+  "status": "healthy",
+  "version": "3.0.0",
+  "endpoints": {
+    "mcp": "/mcp",
+    "sse": "/sse", 
+    "messages": "/messages"
+  },
+  "authentication": "required",
+  "sseSupport": true
+}
+
+✅ SSE connection opened
+📡 Received endpoint URL: https://mfai-repository-navigator.little-grass-273a.workers.dev/messages
+  ✅ Initialize response received
+  ✅ Tools list response received
+  ✅ Tool call response received
+  ✅ Bearer token authentication successful
+```
+
+### Manual Testing with curl
+
+```bash
+# Test SSE stream (should show continuous output)
+curl -N -H "Accept: text/event-stream" \
+  -H "Authorization: Bearer your_api_key_here" \
+  https://mfai-repository-navigator.little-grass-273a.workers.dev/sse
+
+# Expected output:
+# event: endpoint
+# data: https://mfai-repository-navigator.little-grass-273a.workers.dev/messages
+# : ping
+# : ping
+# ...
 ```
 
 ## Using the Proxy Script for stdio Clients
@@ -457,14 +601,14 @@ Cursor currently only supports stdio transport, not direct HTTP connections. You
       "command": "node",
       "args": ["/path/to/mfai_mcp_server_cloudflare/proxy.js"],
       "env": {
-        "MCP_API_KEY": "c12194ba7bd90b7a4183633cfb5ee6251c3db0324b52b456dd43dd2a48c32c86"
+        "MCP_API_KEY": "your_api_key_here"
       }
     }
   }
 }
 ```
 
-**Option 2: Use mcp-remote with SSE (Requires SSE endpoint)**
+**Option 2: Use mcp-remote with SSE (Recommended)**
 ```json
 {
   "mcpServers": {
@@ -473,14 +617,19 @@ Cursor currently only supports stdio transport, not direct HTTP connections. You
       "args": [
         "-y",
         "mcp-remote@latest",
-        "https://mfai-repository-navigator.little-grass-273a.workers.dev/sse"
-      ]
+        "https://mfai-repository-navigator.little-grass-273a.workers.dev/sse",
+        "--header",
+        "Authorization:Bearer ${MCP_API_KEY}"
+      ],
+      "env": {
+        "MCP_API_KEY": "your_api_key_here"
+      }
     }
   }
 }
 ```
 
-**Note**: Option 2 requires implementing an SSE endpoint on the server, which is not currently available.
+**Note**: This uses the new SSE endpoint which supports Bearer token authentication. **✅ Fully tested and working.**
 
 #### For Future HTTP-Compatible Clients
 
@@ -553,13 +702,12 @@ npx wrangler tail
 
 ## Limitations
 
-- **No SSE Support**: Stateless mode doesn't support server-sent events
-- **No Push Notifications**: Can't push updates to clients
+- **No Push Notifications**: Can't push updates to clients (except via SSE endpoint)
 - **Request Limits**: 
   - 10ms CPU time (free plan)
   - 50ms CPU time (paid plan)
   - 100MB maximum request size
-- **No Persistent Connections**: Each request is isolated
+- **Limited Persistent Connections**: SSE connections are supported but stateless
 
 ## Cost Considerations
 
