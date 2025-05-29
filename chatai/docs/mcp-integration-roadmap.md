@@ -9,11 +9,18 @@ This roadmap outlines the integration of Model Context Protocol (MCP) tools into
 
 ## Revolutionary AI SDK 5 Alpha Features for MCP Integration
 
-### 🎯 **prepareStep Intelligence**
-- **Forced Tool Selection**: Automatically trigger appropriate MCP tools based on query analysis
-- **Multi-Step Workflows**: Create intelligent repository exploration sequences
-- **Dynamic Tool Constraints**: Limit available tools based on conversation context
-- **Smart Search Strategy**: Auto-select text vs semantic search based on query characteristics
+### 🎯 **LLM-Powered Intelligence (NO HARDCODING)**
+- **LLM Intent Analysis**: Use the model itself to understand user queries and determine optimal strategies
+- **Dynamic Tool Selection**: LLM decides which tools to use based on contextual understanding
+- **Smart Search Strategy**: LLM analyzes queries to select text/semantic/hybrid search approaches
+- **Relevance Scoring**: LLM evaluates search result relevance with reasoning
+- **Adaptive Workflows**: Multi-step processes guided by LLM decision-making
+
+### 🚀 **prepareStep Intelligence**
+- **Forced Tool Selection**: LLM-driven automatic tool triggering
+- **Multi-Step Workflows**: Create intelligent repository exploration sequences 
+- **Dynamic Tool Constraints**: LLM-based tool availability decisions
+- **Context-Aware Processing**: Each step informed by LLM analysis
 
 ### 🚀 **Enhanced Streaming & Real-Time UX**
 - **AI SDK 5 SSE Support**: More stable and efficient real-time streaming
@@ -107,46 +114,50 @@ export class RepositoryIntentAnalyzer {
 }
 ```
 
-#### 1.2 Advanced prepareStep Workflow Engine
-Create intelligent tool orchestration using prepareStep:
+#### 1.2 LLM-Powered Intent Analysis & Workflow Engine
+Create intelligent tool orchestration using LLM-based intent analysis with prepareStep:
 
 **File:** `/lib/ai/workflow-engine.ts`
 ```typescript
+import { generateText } from 'ai';
+
 export const repositoryWorkflowAgent = experimental_generateSteps({
   experimental_prepareStep: async ({ model, stepNumber, message }) => {
-    const intent = RepositoryIntentAnalyzer.analyzeQuery(message.content);
+    // LLM-powered intent analysis
+    const intentAnalysis = await analyzeUserIntent(message.content);
     
-    // Step 0: Repository Discovery Phase
-    if (stepNumber === 0 && intent.needsRepositoryDiscovery) {
+    // Step 0: LLM decides if repository discovery is needed
+    if (stepNumber === 0 && intentAnalysis.needsRepositoryDiscovery) {
       return {
         model,
         toolChoice: { type: 'tool', toolName: 'listRepositories' },
         experimental_activeTools: ['listRepositories'],
-        experimental_context: { phase: 'discovery', intent }
+        experimental_context: { phase: 'discovery', intent: intentAnalysis }
       };
     }
     
-    // Step 1: Intelligent Search Phase
-    if (stepNumber === 1 && intent.action === 'search') {
+    // Step 1: LLM-guided search strategy selection
+    if (stepNumber === 1 && intentAnalysis.shouldSearch) {
       return {
         model,
-        toolChoice: { type: 'tool', toolName: 'mfaiSearch' },
-        experimental_activeTools: ['mfaiSearch'],
+        toolChoice: { type: 'tool', toolName: 'intelligentMfaiSearch' },
+        experimental_activeTools: ['intelligentMfaiSearch'],
         experimental_toolParameters: {
-          mfaiSearch: {
-            search_type: intent.searchType,
-            repositories: intent.repositories !== 'all' ? intent.repositories : undefined
+          intelligentMfaiSearch: {
+            strategy: intentAnalysis.optimalSearchStrategy,
+            parallel_search: intentAnalysis.benefitsFromParallelSearch,
+            repositories: intentAnalysis.targetRepositories
           }
         }
       };
     }
     
-    // Step 2: Result Enhancement Phase
-    if (stepNumber === 2 && intent.needsResultEnhancement) {
+    // Step 2: LLM decides on result enhancement
+    if (stepNumber === 2 && intentAnalysis.shouldEnhanceResults) {
       return {
         model,
         toolChoice: { type: 'tool', toolName: 'createDocument' },
-        experimental_activeTools: ['createDocument', 'mfaiSearch'],
+        experimental_activeTools: ['createDocument', 'intelligentMfaiSearch'],
         experimental_context: { phase: 'enhancement' }
       };
     }
@@ -155,6 +166,42 @@ export const repositoryWorkflowAgent = experimental_generateSteps({
     return { model };
   }
 });
+
+// LLM-powered intent analysis function
+async function analyzeUserIntent(userQuery: string) {
+  const result = await generateText({
+    model: myProvider.languageModel('chat-model'),
+    messages: [
+      {
+        role: 'system',
+        content: `You are an expert at analyzing user queries for MODFLOW repository search systems.
+        
+        Analyze the user's query and determine:
+        1. Does the user need to see available repositories first? (needsRepositoryDiscovery)
+        2. Does the user want to search for specific content? (shouldSearch)
+        3. What search strategy is optimal? (optimalSearchStrategy: 'text' | 'semantic' | 'hybrid')
+        4. Would parallel searching improve results? (benefitsFromParallelSearch)
+        5. Which repositories should be targeted? (targetRepositories or null for all)
+        6. Should results be enhanced with documentation? (shouldEnhanceResults)
+        
+        Respond in JSON format with these exact field names.
+        
+        Examples:
+        - "What MODFLOW repositories are available?" → needsRepositoryDiscovery: true
+        - "Find groundwater pumping examples" → shouldSearch: true, optimalSearchStrategy: 'semantic'
+        - "Search for 'flopy.modflow.mfwel'" → shouldSearch: true, optimalSearchStrategy: 'text'
+        - "Complete guide to boundary conditions" → shouldSearch: true, shouldEnhanceResults: true, benefitsFromParallelSearch: true`
+      },
+      {
+        role: 'user',
+        content: userQuery
+      }
+    ],
+    temperature: 0.1,
+  });
+
+  return JSON.parse(result.text);
+}
 ```
 
 #### 1.2 Environment Configuration
@@ -268,12 +315,14 @@ export const intelligentMfaiSearch = ({ session, dataStream }: ToolProps) =>
           repositories_searched: repositories || 'all'
         });
 
-        // Stream individual results with enhanced formatting
+        // Stream individual results with LLM-powered relevance scoring
         for (const [index, searchResult] of searchResults.entries()) {
+          const relevanceScore = await calculateLLMRelevanceScore(searchResult, query);
           dataStream.writeCustomData('result-item', {
             index: index + 1,
             ...searchResult,
-            relevanceScore: calculateRelevanceScore(searchResult, query)
+            relevanceScore,
+            relevanceReasoning: relevanceScore.reasoning
           });
         }
 
@@ -286,18 +335,91 @@ export const intelligentMfaiSearch = ({ session, dataStream }: ToolProps) =>
     },
   });
 
-// AI-powered search strategy analysis
-function analyzeQueryForOptimalSearch(query: string): 'text' | 'semantic' {
-  // Analyze query characteristics
-  const hasSpecificTerms = /\b(flopy|modflow|package|\.py|\.nam)\b/i.test(query);
-  const hasQuestionWords = /\b(how|what|why|when|where)\b/i.test(query);
-  const hasQuotes = query.includes('"') || query.includes("'");
-  
-  if (hasQuotes || hasSpecificTerms) return 'text';
-  if (hasQuestionWords) return 'semantic';
-  
-  // Default to semantic for natural language queries
-  return query.split(' ').length > 3 ? 'semantic' : 'text';
+// LLM-powered search strategy analysis
+async function analyzeQueryForOptimalSearch(query: string): Promise<'text' | 'semantic' | 'hybrid'> {
+  const result = await generateText({
+    model: myProvider.languageModel('chat-model'),
+    messages: [
+      {
+        role: 'system',
+        content: `You are an expert at determining optimal search strategies for MODFLOW repository queries.
+
+        Given a user query, determine the best search strategy:
+        
+        - "text": For exact matches, specific function names, file names, code snippets, or quoted terms
+        - "semantic": For conceptual questions, "how to" queries, understanding workflows, or finding similar approaches  
+        - "hybrid": For comprehensive searches that benefit from both exact matches and conceptual similarity
+
+        Consider:
+        - Quotes or specific technical terms → text search
+        - Questions about concepts or approaches → semantic search  
+        - Requests for "everything about" or "complete guide" → hybrid search
+        
+        Respond with only: "text", "semantic", or "hybrid"`
+      },
+      {
+        role: 'user', 
+        content: `Query: "${query}"`
+      }
+    ],
+    temperature: 0.1,
+  });
+
+  const strategy = result.text.trim().toLowerCase();
+  return ['text', 'semantic', 'hybrid'].includes(strategy) 
+    ? strategy as 'text' | 'semantic' | 'hybrid'
+    : 'semantic'; // Default fallback
+}
+
+// LLM-powered relevance scoring instead of hardcoded calculations
+async function calculateLLMRelevanceScore(searchResult: any, userQuery: string) {
+  const result = await generateText({
+    model: myProvider.languageModel('chat-model'),
+    messages: [
+      {
+        role: 'system',
+        content: `You are an expert at scoring relevance between search results and user queries for MODFLOW repositories.
+
+        Given a search result and user query, provide:
+        1. A relevance score from 0.0 to 1.0 (where 1.0 is perfectly relevant)
+        2. A brief reasoning for the score
+
+        Consider:
+        - How well the file content matches the user's intent
+        - Whether the file contains the specific information requested
+        - The quality and usefulness of the code/content for the user's needs
+        - The file's role in typical MODFLOW workflows
+
+        Respond in JSON format:
+        {
+          "score": 0.85,
+          "reasoning": "Brief explanation of why this file is relevant"
+        }`
+      },
+      {
+        role: 'user',
+        content: `User Query: "${userQuery}"
+        
+        Search Result:
+        - Filename: ${searchResult.filename}
+        - Repository: ${searchResult.repo_name}
+        - Path: ${searchResult.filepath}
+        - Content Snippet: ${searchResult.snippet}
+        ${searchResult.similarity ? `- Original Similarity: ${searchResult.similarity}` : ''}`
+      }
+    ],
+    temperature: 0.2,
+  });
+
+  try {
+    return JSON.parse(result.text);
+  } catch {
+    // Fallback to original similarity if LLM parsing fails
+    return {
+      score: searchResult.similarity || 0.5,
+      reasoning: "LLM analysis unavailable, using original similarity"
+    };
+  }
 }
 ```
 
@@ -454,10 +576,9 @@ Transform the chat route to use intelligent tool orchestration:
 
 **File:** `/app/(chat)/api/chat/route.ts`
 ```typescript
-import { experimental_generateSteps, experimental_prepareStep } from 'ai';
+import { experimental_generateSteps, experimental_prepareStep, generateText } from 'ai';
 import { intelligentMfaiSearch } from '@/lib/ai/tools/intelligent-mfai-search';
 import { contextAwareListRepositories } from '@/lib/ai/tools/context-aware-list-repositories';
-import { RepositoryIntentAnalyzer } from '@/lib/ai/intent-analyzer';
 
 export async function POST(request: Request) {
   const { messages, id } = await request.json();
@@ -468,8 +589,8 @@ export async function POST(request: Request) {
     async execute(dataStream) {
       const lastMessage = messages[messages.length - 1];
       
-      // Analyze user intent for intelligent tool selection
-      const repositoryIntent = await RepositoryIntentAnalyzer.analyzeQuery(lastMessage.content);
+      // LLM-powered intent analysis for intelligent tool selection
+      const repositoryIntent = await analyzeLLMIntent(lastMessage.content);
       
       const result = await experimental_generateSteps({
         model: myProvider.languageModel('chat-model'),
@@ -581,6 +702,57 @@ export async function POST(request: Request) {
   });
   
   return dataStream.toResponse();
+}
+
+// LLM-powered intent analysis function
+async function analyzeLLMIntent(userQuery: string) {
+  const result = await generateText({
+    model: myProvider.languageModel('chat-model'),
+    messages: [
+      {
+        role: 'system',
+        content: `Analyze user queries for MODFLOW repository search intent.
+
+        Determine:
+        1. requiresRepositoryContext: boolean - needs to see available repositories
+        2. action: 'search' | 'list' | 'explore' | 'general' - primary user intent
+        3. shouldSearch: boolean - wants to search for content
+        4. optimalSearchStrategy: 'text' | 'semantic' | 'hybrid' - best search approach
+        5. benefitsFromParallelSearch: boolean - would benefit from multiple search strategies
+        6. targetRepositories: string[] | null - specific repos to search or null for all
+        7. shouldEnhanceResults: boolean - should create enhanced documentation
+        8. confidence: number - confidence in analysis (0.0-1.0)
+
+        Respond in JSON format with these exact field names.
+
+        Examples:
+        - "What repositories are available?" → {"requiresRepositoryContext": true, "action": "list", ...}
+        - "Find pumping well examples" → {"shouldSearch": true, "optimalSearchStrategy": "semantic", ...}
+        - "Search for exact function name" → {"shouldSearch": true, "optimalSearchStrategy": "text", ...}`
+      },
+      {
+        role: 'user',
+        content: userQuery
+      }
+    ],
+    temperature: 0.1,
+  });
+
+  try {
+    return JSON.parse(result.text);
+  } catch {
+    // Fallback intent if LLM parsing fails
+    return {
+      requiresRepositoryContext: false,
+      action: 'general',
+      shouldSearch: false,
+      optimalSearchStrategy: 'semantic',
+      benefitsFromParallelSearch: false,
+      targetRepositories: null,
+      shouldEnhanceResults: false,
+      confidence: 0.5
+    };
+  }
 }
 ```
 
@@ -852,8 +1024,8 @@ Allow users to export search results:
 
 ### Phase 1: AI SDK 5 Alpha Foundation (Days 1-4)
 - **Day 1**: AI SDK 5 alpha migration and environment setup
-- **Day 2**: Intent analyzer and workflow engine implementation
-- **Day 3**: prepareStep intelligent orchestration system
+- **Day 2**: LLM-powered intent analysis system (NO HARDCODING)
+- **Day 3**: prepareStep intelligent orchestration with LLM decision-making
 - **Day 4**: Enhanced streaming and custom data parts integration
 
 ### Phase 2: Intelligent Tools Development (Days 5-9)
@@ -875,12 +1047,13 @@ Allow users to export search results:
 
 ## Revolutionary Success Criteria
 
-### 🤖 **Intelligent Agent Capabilities**
-- ✅ **Auto-Intent Detection**: System automatically understands user intent (95%+ accuracy)
-- ✅ **Forced Tool Orchestration**: prepareStep automatically triggers optimal tools
-- ✅ **Multi-Step Workflows**: Seamless repository exploration sequences
-- ✅ **Parallel Search Execution**: Hybrid searches provide superior results
-- ✅ **Smart Search Strategy**: AI automatically selects text vs semantic vs hybrid
+### 🤖 **LLM-Powered Intelligent Agent Capabilities**
+- ✅ **LLM Intent Detection**: Model understands user intent with reasoning (95%+ accuracy)
+- ✅ **LLM Tool Orchestration**: prepareStep uses LLM to trigger optimal tools
+- ✅ **LLM-Guided Workflows**: Multi-step sequences driven by model decisions
+- ✅ **LLM Parallel Strategy**: Model determines when parallel searches benefit users
+- ✅ **LLM Search Strategy**: Model analyzes queries to select optimal search approach
+- ✅ **LLM Relevance Scoring**: Model evaluates and explains result relevance
 
 ### 🚀 **Enhanced User Experience**
 - ✅ **Zero-Thought Interface**: Users never need to specify search types
@@ -1045,9 +1218,11 @@ Found 8 pumping well examples in FloPy:
 - **Production Ready**: Built on stable AI SDK 5 alpha foundations
 
 ### 🎯 **Technical Breakthrough**
-- **First Implementation** of AI SDK 5 alpha prepareStep in production
-- **Revolutionary UX** that eliminates the need for users to understand tools
-- **Intelligent Agent** that learns and adapts to user preferences
+- **First LLM-Powered MCP Implementation** using AI SDK 5 alpha prepareStep
+- **Zero-Hardcoding Intelligence** - all decisions made by the model itself
+- **Revolutionary UX** that eliminates the need for users to understand tools  
+- **Self-Reasoning Agent** that explains its decision-making process
+- **Adaptive Intelligence** that improves understanding through conversation context
 - **Seamless Integration** with existing ChatAI architecture
 
 This represents a **paradigm shift** from manual tool selection to **intelligent agent orchestration**, creating the most advanced repository exploration system ever built for groundwater modeling professionals.

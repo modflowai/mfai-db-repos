@@ -25,6 +25,10 @@ import { createDocument } from '@/lib/ai/tools/create-document';
 import { updateDocument } from '@/lib/ai/tools/update-document';
 import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
 import { getWeather } from '@/lib/ai/tools/get-weather';
+import { intelligentMfaiSearch } from '@/lib/ai/tools/intelligent-mfai-search';
+import { listRepositories } from '@/lib/ai/tools/list-repositories';
+import { createRepositoryWorkflow } from '@/lib/ai/workflow-engine';
+import { LLMIntentAnalyzer } from '@/lib/ai/llm-intent-analyzer';
 import { isProductionEnvironment } from '@/lib/constants';
 import { myProvider, AI_PROVIDER } from '@/lib/ai/providers';
 import { postRequestBodySchema, type PostRequestBody } from './schema';
@@ -201,90 +205,155 @@ export async function POST(request: Request) {
     await createStreamId({ streamId, chatId: id });
 
     const stream = createDataStream({
-      execute: (dataStream) => {
-        const result = streamText({
-          model: myProvider.languageModel(selectedChatModel),
-          system: systemPrompt({ selectedChatModel, requestHints }),
-          messages,
-          maxSteps: 5,
-          // Add Google thinking configuration for reasoning model
-          ...(selectedChatModel === 'chat-model-reasoning' && AI_PROVIDER === 'google' ? {
-            providerOptions: {
-              google: {
-                thinkingConfig: {
-                  thinkingBudget: determineBudget(messages),
-                  includeThoughts: true,
+      execute: async (dataStream) => {
+        // Check if MCP is enabled and user query might benefit from repository search
+        const lastMessage = messages[messages.length - 1];
+        const mcpEnabled = process.env.MCP_ENABLED === 'true';
+        
+        // LLM analyzes if this query should use the intelligent workflow
+        let useIntelligentWorkflow = false;
+        if (mcpEnabled && selectedChatModel !== 'chat-model-reasoning') {
+          try {
+            const intentAnalysis = await LLMIntentAnalyzer.analyzeUserIntent(lastMessage.content);
+            useIntelligentWorkflow = intentAnalysis.shouldSearch || intentAnalysis.requiresRepositoryContext;
+            
+            // Debug logging for chat route
+            console.log('🚀 Chat Route Intent Analysis:', {
+              query: lastMessage.content,
+              shouldSearch: intentAnalysis.shouldSearch,
+              requiresRepositoryContext: intentAnalysis.requiresRepositoryContext,
+              useIntelligentWorkflow,
+              action: intentAnalysis.action,
+              confidence: intentAnalysis.confidence
+            });
+            
+            if (useIntelligentWorkflow) {
+              dataStream.writeData({
+                type: 'text-delta',
+                content: `🤖 **Intelligent Agent Activated**: Using LLM-powered workflow for your query\n\n`,
+              });
+            }
+          } catch (error) {
+            console.warn('Failed to analyze intent for intelligent workflow:', error);
+          }
+        }
+
+        // Use intelligent workflow for repository-related queries
+        if (useIntelligentWorkflow) {
+          const workflow = createRepositoryWorkflow(dataStream);
+          const result = await workflow({
+            model: myProvider.languageModel(selectedChatModel),
+            system: systemPrompt({ selectedChatModel, requestHints }),
+            messages,
+            // Add Google thinking configuration for reasoning model
+            ...(selectedChatModel === 'chat-model-reasoning' && AI_PROVIDER === 'google' ? {
+              providerOptions: {
+                google: {
+                  thinkingConfig: {
+                    thinkingBudget: determineBudget(messages),
+                    includeThoughts: true,
+                  },
                 },
               },
+            } : {}),
+            experimental_transform: smoothStream({ chunking: 'word' }),
+            experimental_generateMessageId: generateUUID,
+            tools: {
+              getWeather,
+              createDocument: createDocument({ session, dataStream }),
+              updateDocument: updateDocument({ session, dataStream }),
+              requestSuggestions: requestSuggestions({ session, dataStream }),
+              // Add MCP tools when enabled
+              intelligentMfaiSearch: intelligentMfaiSearch({ session, dataStream }),
+              listRepositories: listRepositories({ session, dataStream }),
             },
-          } : {}),
-          experimental_activeTools:
-            selectedChatModel === 'chat-model-reasoning' && AI_PROVIDER === 'xai'
-              ? [] // Disable tools only for xAI reasoning mode
-              : [
-                  'getWeather',
-                  'createDocument',
-                  'updateDocument',
-                  'requestSuggestions',
-                ],
-          experimental_transform: smoothStream({ chunking: 'word' }),
-          experimental_generateMessageId: generateUUID,
-          tools: {
-            getWeather,
-            createDocument: createDocument({ session, dataStream }),
-            updateDocument: updateDocument({ session, dataStream }),
-            requestSuggestions: requestSuggestions({
-              session,
-              dataStream,
-            }),
-          },
-          onFinish: async ({ response }) => {
-            if (session.user?.id) {
-              try {
-                const assistantId = getTrailingMessageId({
-                  messages: response.messages.filter(
-                    (message) => message.role === 'assistant',
-                  ),
-                });
+          });
 
-                if (!assistantId) {
-                  throw new Error('No assistant message found!');
-                }
-
-                const [, assistantMessage] = appendResponseMessages({
-                  messages: [message],
-                  responseMessages: response.messages,
-                });
-
-                await saveMessages({
-                  messages: [
-                    {
-                      id: assistantId,
-                      chatId: id,
-                      role: assistantMessage.role,
-                      parts: assistantMessage.parts,
-                      attachments:
-                        assistantMessage.experimental_attachments ?? [],
-                      createdAt: new Date(),
-                    },
+          result.consumeStream();
+          result.mergeIntoDataStream(dataStream, { sendReasoning: true });
+        } else {
+          // Use standard streamText for general conversations
+          const result = streamText({
+            model: myProvider.languageModel(selectedChatModel),
+            system: systemPrompt({ selectedChatModel, requestHints }),
+            messages,
+            maxSteps: 5,
+            // Add Google thinking configuration for reasoning model
+            ...(selectedChatModel === 'chat-model-reasoning' && AI_PROVIDER === 'google' ? {
+              providerOptions: {
+                google: {
+                  thinkingConfig: {
+                    thinkingBudget: determineBudget(messages),
+                    includeThoughts: true,
+                  },
+                },
+              },
+            } : {}),
+            experimental_activeTools:
+              selectedChatModel === 'chat-model-reasoning' && AI_PROVIDER === 'xai'
+                ? [] // Disable tools only for xAI reasoning mode
+                : [
+                    'getWeather',
+                    'createDocument',
+                    'updateDocument',
+                    'requestSuggestions',
+                    // Add MCP tools to standard flow when enabled
+                    ...(mcpEnabled ? ['intelligentMfaiSearch', 'listRepositories'] : []),
                   ],
-                });
-              } catch (_) {
-                console.error('Failed to save chat');
-              }
+            experimental_transform: smoothStream({ chunking: 'word' }),
+            experimental_generateMessageId: generateUUID,
+            tools: {
+              getWeather,
+              createDocument: createDocument({ session, dataStream }),
+              updateDocument: updateDocument({ session, dataStream }),
+              requestSuggestions: requestSuggestions({ session, dataStream }),
+              // Add MCP tools when enabled
+              ...(mcpEnabled ? {
+                intelligentMfaiSearch: intelligentMfaiSearch({ session, dataStream }),
+                listRepositories: listRepositories({ session, dataStream }),
+              } : {}),
+            },
+          });
+
+          result.consumeStream();
+          result.mergeIntoDataStream(dataStream, { sendReasoning: true });
+        }
+      },
+      onFinish: async ({ response }) => {
+        if (session.user?.id) {
+          try {
+            const assistantId = getTrailingMessageId({
+              messages: response.messages.filter(
+                (message) => message.role === 'assistant',
+              ),
+            });
+
+            if (!assistantId) {
+              throw new Error('No assistant message found!');
             }
-          },
-          experimental_telemetry: {
-            isEnabled: isProductionEnvironment,
-            functionId: 'stream-text',
-          },
-        });
 
-        result.consumeStream();
+            const [, assistantMessage] = appendResponseMessages({
+              messages: [message],
+              responseMessages: response.messages,
+            });
 
-        result.mergeIntoDataStream(dataStream, {
-          sendReasoning: true,
-        });
+            await saveMessages({
+              messages: [
+                {
+                  id: assistantId,
+                  chatId: id,
+                  role: assistantMessage.role,
+                  parts: assistantMessage.parts,
+                  attachments:
+                    assistantMessage.experimental_attachments ?? [],
+                  createdAt: new Date(),
+                },
+              ],
+            });
+          } catch (_) {
+            console.error('Failed to save chat');
+          }
+        }
       },
       onError: () => {
         return 'Oops, an error occurred!';
