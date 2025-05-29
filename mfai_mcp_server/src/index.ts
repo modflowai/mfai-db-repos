@@ -66,8 +66,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: 'search_files',
-        description: 'Search for files in the repositories using either text search (for exact terms, keywords, errors) or semantic search (for concepts, questions).',
+        name: 'mfai_search',
+        description: 'Search across all MFAI indexed repositories in the database. No path needed. Use text search for exact terms/keywords or semantic search for concepts/questions.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -103,20 +103,33 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { include_navigation } = ListRepositoriesSchema.parse(args);
         
         // Simple query - just get the data
-        const repositories = await sql`
-          SELECT 
-            id, 
-            name, 
-            url, 
-            file_count,
-            ${include_navigation ? sql`metadata->>'navigation_guide' as navigation_guide,` : sql``}
-            ${include_navigation ? sql`metadata->>'repository_type' as repository_type,` : sql``}
-            created_at, 
-            updated_at
-          FROM repositories
-          ORDER BY updated_at DESC
-          LIMIT 1
-        `;
+        const repositories = include_navigation
+          ? await sql`
+              SELECT 
+                id, 
+                name, 
+                url, 
+                file_count,
+                metadata->>'navigation_guide' as navigation_guide,
+                metadata->>'repository_type' as repository_type,
+                created_at, 
+                updated_at
+              FROM repositories
+              ORDER BY id ASC
+              LIMIT 50
+            `
+          : await sql`
+              SELECT 
+                id, 
+                name, 
+                url, 
+                file_count,
+                created_at, 
+                updated_at
+              FROM repositories
+              ORDER BY id ASC
+              LIMIT 50
+            `;
 
         return {
           content: [
@@ -128,7 +141,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case 'search_files': {
+      case 'mfai_search': {
         const { query, search_type, repositories } = SearchFilesSchema.parse(args);
         
         if (search_type === 'text') {
@@ -138,7 +151,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           
           const results = repositories?.length
             ? await sql`
-                SELECT 
+                SELECT DISTINCT ON (rf.repo_name)
                   rf.id,
                   rf.repo_id,
                   rf.repo_name,
@@ -158,8 +171,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 FROM repository_files rf
                 WHERE rf.content_tsvector @@ to_tsquery('english', ${tsQuery})
                   AND rf.repo_name = ANY(${repositories})
-                ORDER BY rank DESC
-                LIMIT 1
+                ORDER BY rf.repo_name, rank DESC
               `
             : await sql`
                 SELECT 
@@ -210,7 +222,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           
           const results = repositories?.length
             ? await sql`
-                SELECT 
+                SELECT DISTINCT ON (rf.repo_name)
                   rf.id,
                   rf.repo_id,
                   rf.repo_name,
@@ -225,8 +237,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 FROM repository_files rf
                 WHERE rf.embedding IS NOT NULL
                   AND rf.repo_name = ANY(${repositories})
-                ORDER BY rf.embedding <=> ${pgVector}::vector
-                LIMIT 1
+                ORDER BY rf.repo_name, rf.embedding <=> ${pgVector}::vector
               `
             : await sql`
                 SELECT 
