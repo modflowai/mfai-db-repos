@@ -10,6 +10,21 @@ This is the Cloudflare Workers version of the MFAI Repository Navigator MCP serv
 - **Automatic Scaling**: Handles load automatically
 - **Built-in Security**: Cloudflare's security features included
 
+## Important: Cursor IDE Compatibility
+
+**Cursor IDE currently only supports stdio transport, not direct HTTP connections.** This means:
+- You cannot connect Cursor directly to this Cloudflare Worker
+- You must use the included `proxy.js` script as a local bridge
+- The proxy runs locally but all processing happens on Cloudflare
+- Future MCP clients may support direct HTTP connections
+
+### Understanding the Difference
+
+- **Cloudflare's @cloudflare/mcp-server-cloudflare**: Runs locally, connects to Cloudflare API
+- **This server**: Runs entirely on Cloudflare Workers, accessed via HTTP
+
+Since this is a truly remote server (not a local server connecting to an API), Cursor needs a local bridge to communicate with it.
+
 ## Prerequisites
 
 - Node.js 18+ installed
@@ -86,7 +101,7 @@ npx wrangler login
 # Deploy to production
 npx wrangler deploy
 
-# You'll get a URL like: https://mfai-repository-navigator.your-subdomain.workers.dev
+# You'll get a URL like: https://mfai-repository-navigator.little-grass-273a.workers.dev
 ```
 
 ### 7. Set Production Secrets
@@ -189,23 +204,52 @@ Keys are stored in `.mcp-keys.json` (gitignored) for your reference.
 #### Client Configuration with Authentication
 
 When sharing with MCP clients, they need the API key:
+
+**For Cursor IDE:**
+
+Cursor requires stdio transport. Since our server is HTTP-only, you'll need to use the included proxy script:
+
 ```json
 {
   "mcpServers": {
     "mfai-navigator": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-remoteservice",
-        "https://your-worker.workers.dev/mcp"
-      ],
+      "command": "node",
+      "args": ["/absolute/path/to/mfai_mcp_server_cloudflare/proxy.js"],
       "env": {
-        "MCP_SERVER_AUTH": "Bearer your_api_key_here"
+        "MCP_API_KEY": "your_api_key_here"
       }
     }
   }
 }
 ```
+
+**Important**: The proxy script runs locally but only acts as a bridge - all actual processing happens on the Cloudflare Worker.
+
+**For Claude Desktop or other HTTP-aware clients:**
+
+These clients may support direct HTTP connections in the future:
+
+```json
+{
+  "mcpServers": {
+    "mfai-navigator": {
+      "url": "https://mfai-repository-navigator.little-grass-273a.workers.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+**Note about environment variables:**
+- The **server** checks for `MCP_API_KEY` (set via `wrangler secret put MCP_API_KEY`)
+- The **client** uses `MCP_SERVER_AUTH` (this is what the remote service proxy expects)
+- In **test scripts**, we use `MCP_API_KEY` directly: `MCP_API_KEY=your_key node test-prod.js`
+
+**IMPORTANT**: The `MCP_SERVER_AUTH` value must include "Bearer " prefix:
+- ✅ Correct: `"MCP_SERVER_AUTH": "Bearer c12194ba7bd90b7a4183633cfb5ee6251c3db0324b52b456dd43dd2a48c32c86"`
+- ❌ Wrong: `"MCP_SERVER_AUTH": "c12194ba7bd90b7a4183633cfb5ee6251c3db0324b52b456dd43dd2a48c32c86"`
 
 **Security Tips:**
 - Never commit API keys to Git
@@ -243,10 +287,48 @@ Update the test script with your production URL:
 
 ```javascript
 // In test-local.js, change:
-const baseUrl = 'https://your-worker.workers.dev/mcp';
+const baseUrl = 'https://mfai-repository-navigator.little-grass-273a.workers.dev/mcp';
 
 // Then run:
 node test-local.js
+```
+
+## Using the Proxy Script for stdio Clients
+
+Since many MCP clients (like Cursor) only support stdio transport, we include a `proxy.js` script that bridges stdio to our HTTP API.
+
+### How it Works
+
+The proxy script:
+1. Reads JSON-RPC messages from stdin
+2. Forwards them to the Cloudflare Worker via HTTP POST
+3. Includes Bearer authentication if configured
+4. Returns responses to stdout
+
+### Usage
+
+```bash
+# Direct usage
+echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | MCP_API_KEY=your_key node proxy.js
+
+# Or configure the server URL
+echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | MCP_API_KEY=your_key node proxy.js https://your-server.workers.dev/mcp
+```
+
+### Configuration in Cursor
+
+```json
+{
+  "mcpServers": {
+    "mfai-navigator": {
+      "command": "node",
+      "args": ["/absolute/path/to/proxy.js"],
+      "env": {
+        "MCP_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
 ```
 
 ## Testing with MCP Inspector
@@ -283,9 +365,15 @@ node test-prod.js
 
 2. **Direct HTTP Testing**:
 ```bash
-# Test with curl
-curl -X POST https://your-worker.workers.dev/mcp \
+# Test with curl (without authentication - will fail if API key is required)
+curl -X POST https://mfai-repository-navigator.little-grass-273a.workers.dev/mcp \
   -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
+
+# Test with curl (with authentication)
+curl -X POST https://mfai-repository-navigator.little-grass-273a.workers.dev/mcp \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your_api_key_here" \
   -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
 ```
 
@@ -295,9 +383,10 @@ curl -X POST https://your-worker.workers.dev/mcp \
 
 1. **Command Line with curl**:
 ```bash
-# Test tools list
-curl -X POST https://your-worker.workers.dev/mcp \
+# Test tools list (with authentication if API key is configured)
+curl -X POST https://mfai-repository-navigator.little-grass-273a.workers.dev/mcp \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your_api_key_here" \
   -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
 ```
 
@@ -354,8 +443,28 @@ Configure MCP clients to connect to your Worker:
 
 ### For Production
 
-**Note**: Since our server uses environment variables (database connection, API keys), but these are configured on Cloudflare's side, not in the client config. The client just needs the URL:
+**Note**: Since our server uses environment variables (database connection, API keys), but these are configured on Cloudflare's side, not in the client config. The client just needs the URL and API key.
 
+#### For Cursor IDE
+
+Cursor currently only supports stdio transport, not direct HTTP connections. You have two options:
+
+**Option 1: Use Local Proxy Script (If you must use our HTTP endpoint)**
+```json
+{
+  "mcpServers": {
+    "mfai-navigator": {
+      "command": "node",
+      "args": ["/path/to/mfai_mcp_server_cloudflare/proxy.js"],
+      "env": {
+        "MCP_API_KEY": "c12194ba7bd90b7a4183633cfb5ee6251c3db0324b52b456dd43dd2a48c32c86"
+      }
+    }
+  }
+}
+```
+
+**Option 2: Use mcp-remote with SSE (Requires SSE endpoint)**
 ```json
 {
   "mcpServers": {
@@ -363,9 +472,28 @@ Configure MCP clients to connect to your Worker:
       "command": "npx",
       "args": [
         "-y",
-        "@modelcontextprotocol/server-remoteservice",
-        "https://your-worker.workers.dev/mcp"
+        "mcp-remote@latest",
+        "https://mfai-repository-navigator.little-grass-273a.workers.dev/sse"
       ]
+    }
+  }
+}
+```
+
+**Note**: Option 2 requires implementing an SSE endpoint on the server, which is not currently available.
+
+#### For Future HTTP-Compatible Clients
+
+When MCP clients support direct HTTP connections:
+
+```json
+{
+  "mcpServers": {
+    "mfai-navigator": {
+      "url": "https://mfai-repository-navigator.little-grass-273a.workers.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer your_api_key_here"
+      }
     }
   }
 }

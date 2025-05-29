@@ -11,6 +11,9 @@ This project consists of two main components working together to provide intelli
 
 ## 📊 Current Status
 
+### 🚧 In Progress
+- **SSE Support for Cursor IDE**: Implementing Server-Sent Events endpoint to enable Cursor compatibility without local proxies
+
 ### ✅ Completed Components
 
 #### 1. Repository Processing Pipeline (Python)
@@ -156,7 +159,18 @@ This project consists of two main components working together to provide intelli
    - Architecture explanations
    - Troubleshooting sections
 
+5. **Discovered Cursor compatibility solution**
+   - Found that `mcp-remote` supports `--header` option
+   - Can pass Bearer tokens for authentication
+   - Created SSE implementation roadmap
+
 ## 🎯 Next Steps & Roadmap
+
+### Immediate Priority - SSE Support for Cursor
+- [ ] Implement SSE (Server-Sent Events) endpoint for Cursor compatibility
+- [ ] Create SSE proxy worker at `/sse` endpoint
+- [ ] Test with `mcp-remote` and `--header` option for Bearer auth
+- [ ] Update documentation with Cursor configuration
 
 ### Short Term
 - [ ] Add request validation and sanitization
@@ -178,17 +192,22 @@ This project consists of two main components working together to provide intelli
 
 ## 🐛 Known Issues
 
-1. **MCP Inspector Compatibility**
+1. **Cursor IDE Compatibility**
+   - Cursor only supports stdio transport, not direct HTTP
+   - Requires SSE endpoint implementation (in progress)
+   - Temporary workaround: use local `proxy.js` script
+
+2. **MCP Inspector Compatibility**
    - Inspector doesn't support Streamable HTTP transport yet
    - Must use provided test scripts
 
-2. **Large File Handling**
+3. **Large File Handling**
    - Currently truncates very large files
    - Chunk-based processing planned
 
-3. **Session Management**
-   - Stateless only (no SSE support)
-   - Appropriate for current use case
+4. **Session Management**
+   - Currently stateless HTTP only
+   - SSE support planned for Cursor compatibility
 
 ## 📝 Configuration Files
 
@@ -200,6 +219,7 @@ This project consists of two main components working together to provide intelli
 - `wrangler.toml` - Cloudflare deployment config
 - `.dev.vars` - Local development secrets
 - `package.json` - Dependencies and scripts
+- `proxy.js` - Temporary stdio-to-HTTP bridge for Cursor
 
 ## 🔐 Security Considerations
 
@@ -215,9 +235,16 @@ This project consists of two main components working together to provide intelli
 - **Database**: `/docs/database-guide.md`
 - **MCP Implementation**: `/docs/mcp_server_implementation_checkpoint.md`
 - **Cloudflare Deployment**: `/docs/remote_mcp_cloudflare.md`
+- **SSE Implementation Plan**: `/docs/mcp_sse_roadmap.md`
 
 ## 🎉 Summary
 
 The project has successfully evolved from a local Python CLI tool to a globally distributed MCP server. The main processing pipeline efficiently indexes repositories with AI-enhanced navigation guides, while the Cloudflare Workers deployment provides fast, secure access to this knowledge base from anywhere in the world.
 
-**Key Achievement**: We've built a production-ready system that makes MODFLOW repository knowledge accessible through the Model Context Protocol, with proper authentication and global distribution.
+**Key Achievements**: 
+- Built a production-ready system that makes MODFLOW repository knowledge accessible through the Model Context Protocol
+- Deployed globally on Cloudflare Workers with Bearer token authentication
+- Discovered solution for Cursor IDE compatibility using `mcp-remote` with `--header` option
+- Created comprehensive documentation and roadmap for SSE implementation
+
+**Current Focus**: Implementing SSE support to enable seamless Cursor integration without local components.

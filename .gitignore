@@ -62,3 +62,4 @@ mfai_mcp_server/build/
 # Chatai
 chatai/node_modules/
 chatai/build/
+.examples/
