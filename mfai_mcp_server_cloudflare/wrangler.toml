@@ -1,0 +1,12 @@
+name = "mfai-repository-navigator"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+MCP_SERVER_NAME = "mfai-repository-navigator"
+MCP_SERVER_VERSION = "3.0.0"
+
+# Secrets to be set via wrangler:
+# wrangler secret put MODFLOW_AI_MCP_00_CONNECTION_STRING
+# wrangler secret put OPENAI_API_KEY
