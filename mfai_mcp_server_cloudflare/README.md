@@ -45,14 +45,14 @@ These IDEs work perfectly with direct HTTP transport:
 
 ### Cursor IDE ⚠️
 
-Cursor has known compatibility issues with mcp-remote. Use the included wrapper script:
+Cursor has known compatibility issues with mcp-remote. Use our npm wrapper package:
 
 ```json
 {
   "mcpServers": {
     "mfai": {
-      "command": "node",
-      "args": ["/absolute/path/to/cursor-mcp-wrapper.js"],
+      "command": "npx",
+      "args": ["-y", "@modflowai/mcp-cursor-wrapper"],
       "env": {
         "MFAI_API_KEY": "your_api_key_here"
       }
@@ -63,7 +63,7 @@ Cursor has known compatibility issues with mcp-remote. Use the included wrapper 
 
 **Status: ✅ Working with Wrapper** - The wrapper handles Cursor's compatibility issues while still using HTTP transport.
 
-**Note**: The wrapper script (`cursor-mcp-wrapper.js`) is included in this repository. It internally uses the same HTTP transport but works around Cursor-specific issues.
+**Note**: The wrapper is available as an npm package (`@modflowai/mcp-cursor-wrapper`) for easy installation. Alternatively, you can use the local `cursor-mcp-wrapper.js` script included in this repository.
 
 ### Understanding the Difference
 
@@ -460,8 +460,8 @@ The `cursor-mcp-wrapper.js` script:
 {
   "mcpServers": {
     "mfai": {
-      "command": "node",
-      "args": ["/path/to/mfai_mcp_server_cloudflare/cursor-mcp-wrapper.js"],
+      "command": "npx",
+      "args": ["-y", "@modflowai/mcp-cursor-wrapper"],
       "env": {
         "MFAI_API_KEY": "your_api_key_here"
       }
@@ -502,7 +502,7 @@ If you prefer, you can also use the simpler `proxy.js` script included in the re
 }
 ```
 
-The main difference is that `cursor-mcp-wrapper.js` uses mcp-remote (providing full MCP protocol support), while `proxy.js` is a simpler stdio-to-HTTP bridge.
+The main difference is that the npm wrapper uses mcp-remote (providing full MCP protocol support), while `proxy.js` is a simpler stdio-to-HTTP bridge.
 
 ## Testing with MCP Inspector
 

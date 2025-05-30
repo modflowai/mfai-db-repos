@@ -1,0 +1,36 @@
+{
+  "name": "@modflowai/mcp-cursor-wrapper",
+  "version": "1.0.0",
+  "description": "Cursor IDE wrapper for MFAI Repository Navigator MCP server",
+  "main": "index.js",
+  "bin": {
+    "mfai-mcp-cursor": "./index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "node index.js"
+  },
+  "keywords": [
+    "mcp",
+    "cursor",
+    "modflow",
+    "ai",
+    "wrapper"
+  ],
+  "author": "ModFlow AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/modflowai/mfai-mcp-cursor-wrapper.git"
+  },
+  "bugs": {
+    "url": "https://github.com/modflowai/mfai-mcp-cursor-wrapper/issues"
+  },
+  "homepage": "https://github.com/modflowai/mfai-mcp-cursor-wrapper#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
