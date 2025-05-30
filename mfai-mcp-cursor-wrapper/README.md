@@ -8,8 +8,18 @@ You don't need to install this package separately. It can be run directly using 
 
 ## Usage
 
-Add this configuration to your Cursor MCP settings (usually in `~/.cursor/mcp.json` or through Cursor's settings):
+## IDE-Specific Configurations
 
+### Cursor IDE & Claude Desktop (Use This Wrapper)
+
+**Config Location:**
+- **Cursor**: `~/.cursor/mcp.json` or Cursor Settings > MCP
+- **Claude Desktop**: 
+  - macOS: `~/Library/Application Support/Claude/claude-desktop-config.json`
+  - Windows: `%APPDATA%\Claude\claude-desktop-config.json`
+  - Linux: `~/.config/Claude/claude-desktop-config.json`
+
+**Configuration:**
 ```json
 {
   "mcpServers": {
@@ -23,6 +33,39 @@ Add this configuration to your Cursor MCP settings (usually in `~/.cursor/mcp.js
   }
 }
 ```
+
+### VS Code & Windsurf (Direct HTTP - No Wrapper Needed)
+
+**Config Location:** `.vscode/settings.json` or VS Code Settings > MCP
+
+**Configuration:**
+```json
+{
+  "mcpServers": {
+    "mfai": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "https://mfai-repository-navigator.little-grass-273a.workers.dev/mcp",
+        "--header",
+        "Authorization:Bearer your_api_key_here",
+        "--transport",
+        "http-only"
+      ]
+    }
+  }
+}
+```
+
+## Compatibility Matrix
+
+| IDE | Method | Status | Notes |
+|-----|--------|--------|-------|
+| **Cursor** | Wrapper | ✅ Working | Requires wrapper for Windows npx compatibility |
+| **Claude Desktop** | Wrapper | ✅ Working | Requires wrapper for Windows npx compatibility |
+| **VS Code** | Direct HTTP | ✅ Working | Native mcp-remote support |
+| **Windsurf** | Direct HTTP | ✅ Working | Native mcp-remote support |
 
 ## Configuration
 

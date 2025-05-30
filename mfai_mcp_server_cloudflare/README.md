@@ -15,27 +15,24 @@ This is the Cloudflare Workers version of the MFAI Repository Navigator MCP serv
 
 ## IDE Compatibility
 
-### VS Code & Windsurf ✅
+### VS Code & Windsurf ✅ (Direct HTTP)
 
 These IDEs work perfectly with direct HTTP transport:
 
 ```json
 {
   "mcpServers": {
-    "mfai-navigator": {
+    "mfai": {
       "command": "npx",
       "args": [
         "-y",
-        "mcp-remote@latest", 
+        "mcp-remote@latest",
         "https://mfai-repository-navigator.little-grass-273a.workers.dev/mcp",
         "--header",
-        "Authorization:Bearer ${AUTH_HEADER}",
+        "Authorization:Bearer your_api_key_here",
         "--transport",
         "http-only"
-      ],
-      "env": {
-        "AUTH_HEADER": "your_api_key_here"
-      }
+      ]
     }
   }
 }
@@ -43,9 +40,9 @@ These IDEs work perfectly with direct HTTP transport:
 
 **Status: ✅ Tested and Working** - Direct HTTP transport provides the best performance and reliability.
 
-### Cursor IDE ⚠️
+### Cursor IDE & Claude Desktop ⚠️ (Use Wrapper)
 
-Cursor has known compatibility issues with mcp-remote. Use our npm wrapper package:
+These IDEs have Windows compatibility issues with mcp-remote npx path resolution. Use our npm wrapper package:
 
 ```json
 {
@@ -61,7 +58,21 @@ Cursor has known compatibility issues with mcp-remote. Use our npm wrapper packa
 }
 ```
 
-**Status: ✅ Working with Wrapper** - The wrapper handles Cursor's compatibility issues while still using HTTP transport.
+**Status: ✅ Working with Wrapper** - The wrapper handles Windows npx path issues while still using HTTP transport and Bearer authentication.
+
+## IDE Configuration Summary
+
+| IDE | Method | Configuration |
+|-----|--------|---------------|
+| **VS Code** | Direct HTTP | Use `mcp-remote` with `--transport http-only` |
+| **Windsurf** | Direct HTTP | Use `mcp-remote` with `--transport http-only` |
+| **Cursor** | Wrapper | Use `@modflowai/mcp-server` wrapper |
+| **Claude Desktop** | Wrapper | Use `@modflowai/mcp-server` wrapper |
+
+### Why Different Approaches?
+
+- **VS Code & Windsurf**: Handle `npx` path resolution and environment variables properly
+- **Cursor & Claude Desktop**: Have Windows compatibility issues with spaces in `npx` paths, requiring our wrapper to bridge the gap
 
 **Note**: The wrapper is available as an npm package (`@modflowai/mcp-server`) for easy installation. Alternatively, you can use the local `cursor-mcp-wrapper.js` script included in this repository.
 
