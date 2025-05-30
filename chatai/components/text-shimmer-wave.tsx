@@ -1,7 +1,7 @@
 'use client';
 
-import { type JSX } from 'react';
-import { motion, Transition } from 'framer-motion';
+import type { JSX } from 'react';
+import { motion, type Transition } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 type TextShimmerWave = {
@@ -74,7 +74,7 @@ export function TextShimmerWave({
             }}
             transition={{
               duration: duration,
-              repeat: Infinity,
+              repeat: Number.POSITIVE_INFINITY,
               repeatDelay: (children.length * 0.05) / spread,
               delay,
               ease: 'easeInOut',

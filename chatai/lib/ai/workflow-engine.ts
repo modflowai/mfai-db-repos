@@ -4,7 +4,6 @@
 
 import { streamText } from 'ai';
 import { LLMIntentAnalyzer } from './llm-intent-analyzer';
-import { myProvider } from './providers';
 import type { DataStreamWriter } from 'ai';
 
 export interface WorkflowContext {

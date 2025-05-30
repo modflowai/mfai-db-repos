@@ -49,7 +49,7 @@ export class LLMIntentAnalyzer {
 
             1. requiresRepositoryContext: boolean - Only true if they specifically ask about "what repositories", "available repos", "list repositories"
             2. action: 'search' | 'list' | 'explore' | 'general' - What is their primary intent?
-            3. shouldSearch: boolean - Only true if they want to search for specific MODFLOW/PEST content
+            3. shouldSearch: boolean - Only true if they want to search for specific MODFLOW/PEST content within repositories (NOT for listing repositories)
             4. optimalSearchStrategy: 'text' | 'semantic' | 'hybrid' - What search approach would work best?
                - 'text': For exact matches, specific function names, file names, code snippets
                - 'semantic': For conceptual questions, "how to" queries, understanding workflows

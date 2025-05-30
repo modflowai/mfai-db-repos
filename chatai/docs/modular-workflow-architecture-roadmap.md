@@ -37,11 +37,16 @@ This document outlines the comprehensive refactoring of the current monolithic s
 ### Workflow Overview
 
 ```
-User Query → Relevance Check → Query Analysis → Repository Search → Response Generation → Final Answer
-     ↓              ↓              ↓               ↓                  ↓                ↓
-   Pulsing        Status         Strategy        Documents         Synthesis       Complete
-   Indicator      Update         Display         Found             Progress        Answer
+User Query → Relevance Check → Query Analysis → Context Validation → Repository Search → Response Generation → Final Answer
+     ↓              ↓              ↓               ↓                   ↓                  ↓                ↓
+   Pulsing        Status         Strategy      Check Context      Documents*         Synthesis       Complete
+   Indicator      Update         Display       Sufficiency        Found             Progress        Answer
+                                                   ↓
+                                              Skip Search if
+                                            Context Sufficient
 ```
+
+*Repository Search is conditional - only executed if Context Validation determines insufficient context exists
 
 ## Phase 1: Core Architecture Refactoring
 
@@ -272,7 +277,94 @@ export const queryAnalyzer = createWorkflowTool({
 - Progress: "📊 Determining search strategy..."
 - Complete: "📋 Strategy: semantic search in flopy, modflow6"
 
-### 2.3 Repository Searcher Tool
+### 2.3 Context Validation Tool
+
+**Purpose**: Determine if sufficient context exists from previous searches/conversations to answer the query without performing new searches.
+
+**Expected Duration**: 1-2 seconds
+
+**Implementation Details**:
+```typescript
+export const contextValidator = createWorkflowTool({
+  name: 'Context Validator',
+  description: 'Validates if existing context is sufficient to answer the query',
+  estimatedDuration: 1500,
+  retryable: true,
+  
+  schema: z.object({
+    query: z.string(),
+    analysisContext: z.object({
+      strategy: z.string(),
+      repositories: z.array(z.string()),
+      keywords: z.array(z.string())
+    }),
+    previousResults: z.array(z.any()).optional(),
+    conversationHistory: z.array(z.any()).optional()
+  }),
+  
+  execute: async ({ query, analysisContext, previousResults, conversationHistory }, context) => {
+    await context.streamStatus({
+      tool: 'context-validator',
+      phase: 'starting',
+      currentAction: 'Checking existing context...'
+    });
+
+    // LLM analyzes if previous context can answer the query
+    const contextAnalysis = await analyzeContextSufficiency({
+      query,
+      previousResults,
+      conversationHistory,
+      analysisContext
+    });
+    
+    await context.streamStatus({
+      tool: 'context-validator',
+      phase: 'completed',
+      currentAction: contextAnalysis.needsNewSearch 
+        ? 'New search required' 
+        : 'Sufficient context found'
+    });
+
+    return {
+      success: true,
+      data: {
+        needsNewSearch: contextAnalysis.needsNewSearch,
+        contextSufficiency: contextAnalysis.sufficiency,
+        availableContext: contextAnalysis.availableContext,
+        reasoning: contextAnalysis.reasoning,
+        suggestedResponse: contextAnalysis.needsNewSearch ? null : contextAnalysis.suggestedResponse
+      },
+      shortSummary: contextAnalysis.needsNewSearch 
+        ? '🔍 New search needed - insufficient context'
+        : '✅ Sufficient context available',
+      confidence: contextAnalysis.confidence,
+      nextSuggestedAction: contextAnalysis.needsNewSearch ? 'repository_search' : 'response_generation',
+      metadata: {
+        executionTime: Date.now() - startTime,
+        contextItemsAnalyzed: (previousResults?.length || 0) + (conversationHistory?.length || 0)
+      }
+    };
+  }
+});
+```
+
+**Context Analysis Logic**:
+- **Previous Search Results**: Check if recent searches contain relevant information for the current query
+- **Conversation History**: Analyze if the conversation thread has built up sufficient context
+- **Topic Continuity**: Determine if this is a follow-up question that can be answered from existing context
+- **Content Freshness**: Ensure context is recent and relevant
+- **Query Complexity**: Assess if the query requires new information or can be answered from available context
+
+**Decision Criteria**:
+- **Skip Search If**: Previous results directly answer the query, follow-up question with sufficient context, clarification request
+- **Perform Search If**: New topic, insufficient previous results, complex query requiring fresh information
+
+**Streaming Updates**:
+- Start: "🔍 Checking existing context..."
+- Progress: "📚 Analyzing previous results and conversation..."
+- Complete: "✅ Sufficient context available" or "🔍 New search required"
+
+### 2.4 Repository Searcher Tool
 
 **Purpose**: Execute the actual search operations against MODFLOW repositories.
 
@@ -354,7 +446,7 @@ export const repositorySearcher = createWorkflowTool({
 - Progress: "📚 Searching modflow6 repository... (66%)" 
 - Complete: "📄 Found 8 relevant documents"
 
-### 2.4 Response Generator Tool
+### 2.5 Response Generator Tool
 
 **Purpose**: Synthesize search results into a comprehensive, coherent answer.
 
@@ -447,7 +539,8 @@ export class WorkflowOrchestrator {
   ) {
     this.workflow = [
       relevanceChecker,
-      queryAnalyzer, 
+      queryAnalyzer,
+      contextValidator,
       repositorySearcher,
       responseGenerator
     ];

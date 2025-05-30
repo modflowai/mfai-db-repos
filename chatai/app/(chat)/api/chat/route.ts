@@ -27,9 +27,10 @@ import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
 import { getWeather } from '@/lib/ai/tools/get-weather';
 import { intelligentMfaiSearch } from '@/lib/ai/tools/intelligent-mfai-search';
 import { listRepositories } from '@/lib/ai/tools/list-repositories';
+import { modularMfaiSearch } from '@/lib/ai/tools/modular-mfai-search';
 import { createRepositoryWorkflow } from '@/lib/ai/workflow-engine';
+import { createModularWorkflow, } from '@/lib/ai/modular-workflow-engine';
 import { LLMIntentAnalyzer } from '@/lib/ai/llm-intent-analyzer';
-import { isProductionEnvironment } from '@/lib/constants';
 import { myProvider, AI_PROVIDER } from '@/lib/ai/providers';
 import { postRequestBodySchema, type PostRequestBody } from './schema';
 import { geolocation } from '@vercel/functions';
@@ -212,10 +213,12 @@ export async function POST(request: Request) {
         
         // LLM analyzes if this query should use the intelligent workflow
         let useIntelligentWorkflow = false;
+        let isRepositoryListRequest = false;
         if (mcpEnabled && selectedChatModel !== 'chat-model-reasoning') {
           try {
             const intentAnalysis = await LLMIntentAnalyzer.analyzeUserIntent(lastMessage.content);
-            useIntelligentWorkflow = intentAnalysis.shouldSearch || intentAnalysis.requiresRepositoryContext;
+            useIntelligentWorkflow = intentAnalysis.shouldSearch; // ONLY for actual searches
+            isRepositoryListRequest = intentAnalysis.requiresRepositoryContext; // Separate flag for repo listing
             
             // Debug logging for chat route
             console.log('🚀 Chat Route Intent Analysis:', {
@@ -223,6 +226,7 @@ export async function POST(request: Request) {
               shouldSearch: intentAnalysis.shouldSearch,
               requiresRepositoryContext: intentAnalysis.requiresRepositoryContext,
               useIntelligentWorkflow,
+              isRepositoryListRequest,
               action: intentAnalysis.action,
               confidence: intentAnalysis.confidence
             });
@@ -238,39 +242,111 @@ export async function POST(request: Request) {
           }
         }
 
-        // Use intelligent workflow for repository-related queries
-        if (useIntelligentWorkflow) {
-          const workflow = createRepositoryWorkflow(dataStream);
-          const result = await workflow({
-            model: myProvider.languageModel(selectedChatModel),
-            system: systemPrompt({ selectedChatModel, requestHints }),
-            messages,
-            // Add Google thinking configuration for reasoning model
-            ...(selectedChatModel === 'chat-model-reasoning' && AI_PROVIDER === 'google' ? {
-              providerOptions: {
-                google: {
-                  thinkingConfig: {
-                    thinkingBudget: determineBudget(messages),
-                    includeThoughts: true,
-                  },
-                },
-              },
-            } : {}),
-            experimental_transform: smoothStream({ chunking: 'word' }),
-            experimental_generateMessageId: generateUUID,
-            tools: {
+        // Use modular workflow for both search and repository listing queries  
+        if (useIntelligentWorkflow || isRepositoryListRequest) {
+          // Check if we should use the new modular workflow system
+          const useModularWorkflow = process.env.MODULAR_WORKFLOW_ENABLED !== 'false'; // Default to enabled
+          
+          if (useModularWorkflow) {
+            console.log('🚀 Using Modular Workflow System');
+            console.log('🔧 Modular workflow - available tools:', Object.keys({
               getWeather,
               createDocument: createDocument({ session, dataStream }),
               updateDocument: updateDocument({ session, dataStream }),
               requestSuggestions: requestSuggestions({ session, dataStream }),
-              // Add MCP tools when enabled
               intelligentMfaiSearch: intelligentMfaiSearch({ session, dataStream }),
               listRepositories: listRepositories({ session, dataStream }),
-            },
-          });
+            }));
+            
+            // Use the new modular workflow system
+            const modularWorkflow = createModularWorkflow(dataStream);
+            console.log('🔧 Modular workflow - calling modular workflow engine...');
+            const result = await modularWorkflow({
+              model: myProvider.languageModel(selectedChatModel),
+              system: systemPrompt({ selectedChatModel, requestHints }),
+              messages,
+              // Add Google thinking configuration for reasoning model
+              ...(selectedChatModel === 'chat-model-reasoning' && AI_PROVIDER === 'google' ? {
+                providerOptions: {
+                  google: {
+                    thinkingConfig: {
+                      thinkingBudget: determineBudget(messages),
+                      includeThoughts: true,
+                    },
+                  },
+                },
+              } : {}),
+              experimental_transform: smoothStream({ chunking: 'word' }),
+              experimental_generateMessageId: generateUUID,
+              tools: {
+                getWeather,
+                createDocument: createDocument({ session, dataStream }),
+                updateDocument: updateDocument({ session, dataStream }),
+                requestSuggestions: requestSuggestions({ session, dataStream }),
+                // Add MCP tools when enabled
+                modularMfaiSearch: modularMfaiSearch({ session, dataStream }),
+                intelligentMfaiSearch: intelligentMfaiSearch({ session, dataStream }),
+                listRepositories: listRepositories({ session, dataStream }),
+              },
+            });
 
-          result.consumeStream();
-          result.mergeIntoDataStream(dataStream, { sendReasoning: true });
+            // Handle modular workflow result
+            console.log('🔧 Modular workflow - result type:', typeof result);
+            console.log('🔧 Modular workflow - result constructor:', result?.constructor?.name);
+            console.log('🔧 Modular workflow - result has consumeStream:', typeof result?.consumeStream);
+            console.log('🔧 Modular workflow - result has mergeIntoDataStream:', typeof result?.mergeIntoDataStream);
+            
+            if (result && typeof result.consumeStream === 'function' && typeof result.mergeIntoDataStream === 'function') {
+              // This is a valid StreamText result, process it normally
+              console.log('✅ Processing valid modular workflow StreamText result');
+              console.log('🔧 Modular workflow - starting to consume stream...');
+              result.consumeStream();
+              console.log('🔧 Modular workflow - merging into data stream...');
+              result.mergeIntoDataStream(dataStream, { sendReasoning: true });
+              console.log('✅ Modular workflow - stream processing completed');
+            } else if (result === null) {
+              // Workflow completed and already streamed the response
+              console.log('✅ Modular workflow completed - response already streamed to dataStream');
+            } else {
+              console.log('⚠️ Modular workflow - unexpected result type:', result);
+            }
+          } else {
+            console.log('🔄 Using Legacy Workflow System');
+            
+            // Fall back to legacy workflow system
+            const workflow = createRepositoryWorkflow(dataStream);
+            const result = await workflow({
+              model: myProvider.languageModel(selectedChatModel),
+              system: systemPrompt({ selectedChatModel, requestHints }),
+              messages,
+              // Add Google thinking configuration for reasoning model
+              ...(selectedChatModel === 'chat-model-reasoning' && AI_PROVIDER === 'google' ? {
+                providerOptions: {
+                  google: {
+                    thinkingConfig: {
+                      thinkingBudget: determineBudget(messages),
+                      includeThoughts: true,
+                    },
+                  },
+                },
+              } : {}),
+              experimental_transform: smoothStream({ chunking: 'word' }),
+              experimental_generateMessageId: generateUUID,
+              tools: {
+                getWeather,
+                createDocument: createDocument({ session, dataStream }),
+                updateDocument: updateDocument({ session, dataStream }),
+                requestSuggestions: requestSuggestions({ session, dataStream }),
+                // Add MCP tools when enabled
+                modularMfaiSearch: modularMfaiSearch({ session, dataStream }),
+                intelligentMfaiSearch: intelligentMfaiSearch({ session, dataStream }),
+                listRepositories: listRepositories({ session, dataStream }),
+              },
+            });
+
+            result.consumeStream();
+            result.mergeIntoDataStream(dataStream, { sendReasoning: true });
+          }
         } else {
           // Use standard streamText for general conversations
           const result = streamText({
@@ -297,8 +373,8 @@ export async function POST(request: Request) {
                     'createDocument',
                     'updateDocument',
                     'requestSuggestions',
-                    // Add MCP tools to standard flow when enabled
-                    ...(mcpEnabled ? ['intelligentMfaiSearch', 'listRepositories'] : []),
+                    // MCP tools should NOT be available for general conversations
+                    // ...(mcpEnabled ? ['intelligentMfaiSearch', 'listRepositories'] : []),
                   ],
             experimental_transform: smoothStream({ chunking: 'word' }),
             experimental_generateMessageId: generateUUID,
@@ -307,11 +383,11 @@ export async function POST(request: Request) {
               createDocument: createDocument({ session, dataStream }),
               updateDocument: updateDocument({ session, dataStream }),
               requestSuggestions: requestSuggestions({ session, dataStream }),
-              // Add MCP tools when enabled
-              ...(mcpEnabled ? {
-                intelligentMfaiSearch: intelligentMfaiSearch({ session, dataStream }),
-                listRepositories: listRepositories({ session, dataStream }),
-              } : {}),
+              // MCP tools should NOT be available for general conversations to prevent unwanted tool calls
+              // ...(mcpEnabled ? {
+              //   intelligentMfaiSearch: intelligentMfaiSearch({ session, dataStream }),
+              //   listRepositories: listRepositories({ session, dataStream }),
+              // } : {}),
             },
           });
 

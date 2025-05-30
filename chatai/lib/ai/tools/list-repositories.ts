@@ -23,13 +23,13 @@ export const listRepositories = ({ session, dataStream }: ToolProps) =>
         .describe('The original user query to help LLM customize the presentation'),
     }),
     execute: async ({ include_navigation, user_query }) => {
+      console.log('📚 listRepositories tool EXECUTED with params:', { include_navigation, user_query });
+      console.log('📚 listRepositories - dataStream available:', !!dataStream);
+      
       return withMCPErrorHandling(async () => {
-        // Stream real-time status updates
-        dataStream.writeData({
-          type: 'text-delta',
-          content: '🔍 Fetching MODFLOW repositories...\n\n',
-        });
-
+        console.log('📚 listRepositories - inside withMCPErrorHandling');
+        
+        // No streaming - just fetch data and return like weather tool
         const mcpClient = new MCPClient();
         await mcpClient.connect({
           serverUrl: process.env.MCP_SERVER_URL!,
@@ -42,15 +42,12 @@ export const listRepositories = ({ session, dataStream }: ToolProps) =>
 
         const repositories = JSON.parse(result.content[0].text);
 
-        // LLM analyzes how to present repositories based on user query
+        // Process data but don't stream - return structured result like weather tool
+        let enhancedRepos = repositories;
+        
         if (user_query) {
-          dataStream.writeData({
-            type: 'text-delta',
-            content: '🧠 Analyzing which repositories are most relevant for your query...\n\n',
-          });
-
           // LLM determines relevance and ordering for user's specific needs
-          const enhancedRepos = await Promise.all(
+          enhancedRepos = await Promise.all(
             repositories.map(async (repo: any) => {
               const relevanceAnalysis = await LLMIntentAnalyzer.calculateRelevanceScore(
                 {
@@ -72,61 +69,18 @@ export const listRepositories = ({ session, dataStream }: ToolProps) =>
 
           // Sort by LLM relevance score
           enhancedRepos.sort((a, b) => b.relevanceScore - a.relevanceScore);
-
-          // Stream results with LLM-guided presentation
-          dataStream.writeData({
-            type: 'text-delta',
-            content: `📚 Found ${repositories.length} repositories. Here are the most relevant for your query:\n\n`,
-          });
-
-          for (const repo of enhancedRepos) {
-            const relevanceIndicator = repo.relevanceScore > 0.7 ? '🔥' : 
-                                     repo.relevanceScore > 0.4 ? '⭐' : '📁';
-            
-            dataStream.writeData({
-              type: 'text-delta',
-              content: `${relevanceIndicator} **${repo.name}** (${repo.file_count} files) - ${(repo.relevanceScore * 100).toFixed(0)}% relevant\n` +
-                      `🔗 ${repo.url}\n` +
-                      `💡 Why relevant: ${repo.relevanceReasoning}\n` +
-                      (repo.navigation_guide ? `📖 ${repo.navigation_guide.substring(0, 200)}...\n` : '') +
-                      '\n',
-            });
-          }
-
-          await mcpClient.close();
-          return {
-            repositories: enhancedRepos,
-            count: repositories.length,
-            userQuery: user_query,
-            sortedByRelevance: true,
-            timestamp: new Date().toISOString(),
-          };
-        } else {
-          // Standard presentation without specific user context
-          dataStream.writeData({
-            type: 'text-delta',
-            content: `📚 Found ${repositories.length} MODFLOW repositories:\n\n`,
-          });
-
-          for (const repo of repositories) {
-            dataStream.writeData({
-              type: 'text-delta',
-              content: `📁 **${repo.name}** (${repo.file_count} files)\n` +
-                      `🔗 ${repo.url}\n` +
-                      (repo.navigation_guide ? `📖 ${repo.navigation_guide.substring(0, 200)}...\n` : '') +
-                      '\n',
-            });
-          }
-
-          await mcpClient.close();
-          return {
-            repositories,
-            count: repositories.length,
-            userQuery: null,
-            sortedByRelevance: false,
-            timestamp: new Date().toISOString(),
-          };
         }
+
+        await mcpClient.close();
+        
+        // Return structured data like weather tool - no streaming
+        return {
+          repositories: enhancedRepos,
+          count: repositories.length,
+          userQuery: user_query || null,
+          sortedByRelevance: !!user_query,
+          timestamp: new Date().toISOString(),
+        };
       });
     },
   });
