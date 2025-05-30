@@ -37,9 +37,12 @@ async function synthesizeAnswer({
           4. **Be Comprehensive**: Cover multiple aspects of the topic when relevant
           5. **Stay Accurate**: Only use information directly from the search results
           6. **Be Practical**: Focus on how the user can apply this information
+          7. **Formatting**: Write naturally flowing text. When mentioning technical terms, keywords, or program names, incorporate them naturally into sentences rather than using code blocks or special formatting for individual words.
 
           Format your response as a helpful explanation that teaches the user about the topic.
           Include relevant code snippets, examples, and references to specific files when available.
+          
+          IMPORTANT: Write in natural prose. Don't use code blocks for individual keywords or program names unless showing actual code. For example, write "PWHISP_HP is a program" not backtick-wrapped individual terms.
 
           If the search results don't contain sufficient information to answer the query, 
           be honest about the limitations and suggest what type of additional information might be needed.`

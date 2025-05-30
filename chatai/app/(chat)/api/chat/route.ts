@@ -28,6 +28,9 @@ import { getWeather } from '@/lib/ai/tools/get-weather';
 import { intelligentMfaiSearch } from '@/lib/ai/tools/intelligent-mfai-search';
 import { listRepositories } from '@/lib/ai/tools/list-repositories';
 import { modularMfaiSearch } from '@/lib/ai/tools/modular-mfai-search';
+import { relevanceChecker } from '@/lib/ai/tools/relevance-checker';
+import { queryAnalyzer } from '@/lib/ai/tools/query-analyzer';
+import { repositorySearcher } from '@/lib/ai/tools/repository-searcher';
 import { createRepositoryWorkflow } from '@/lib/ai/workflow-engine';
 import { createModularWorkflow, } from '@/lib/ai/modular-workflow-engine';
 import { LLMIntentAnalyzer } from '@/lib/ai/llm-intent-analyzer';
@@ -285,6 +288,9 @@ export async function POST(request: Request) {
                 requestSuggestions: requestSuggestions({ session, dataStream }),
                 // Add MCP tools when enabled
                 modularMfaiSearch: modularMfaiSearch({ session, dataStream }),
+                relevanceChecker: relevanceChecker({ session, dataStream }),
+                queryAnalyzer: queryAnalyzer({ session, dataStream }),
+                repositorySearcher: repositorySearcher({ session, dataStream }),
                 intelligentMfaiSearch: intelligentMfaiSearch({ session, dataStream }),
                 listRepositories: listRepositories({ session, dataStream }),
               },
@@ -339,6 +345,9 @@ export async function POST(request: Request) {
                 requestSuggestions: requestSuggestions({ session, dataStream }),
                 // Add MCP tools when enabled
                 modularMfaiSearch: modularMfaiSearch({ session, dataStream }),
+                relevanceChecker: relevanceChecker({ session, dataStream }),
+                queryAnalyzer: queryAnalyzer({ session, dataStream }),
+                repositorySearcher: repositorySearcher({ session, dataStream }),
                 intelligentMfaiSearch: intelligentMfaiSearch({ session, dataStream }),
                 listRepositories: listRepositories({ session, dataStream }),
               },

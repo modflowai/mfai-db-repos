@@ -20,14 +20,47 @@ async function searchRepository(
   strategy: string, 
   searchParameters?: any
 ): Promise<SearchResult[]> {
+  // Clean query for PostgreSQL full-text search compatibility
+  const cleanQuery = query
+    .replace(/[()]/g, '') // Remove parentheses that break tsquery
+    .replace(/[^a-zA-Z0-9\s_-]/g, ' ') // Replace special chars with spaces
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+  
+  // Convert strategy to MCP-compatible type
+  let mcpSearchType: 'text' | 'semantic';
+  if (strategy === 'hybrid') {
+    // For hybrid, default to semantic search as it's more comprehensive
+    mcpSearchType = 'semantic';
+  } else {
+    mcpSearchType = strategy as 'text' | 'semantic';
+  }
+  
+  console.log(`🔍 Searching ${repo} with cleaned query: "${cleanQuery}" (original: "${query}"), strategy: ${strategy} → ${mcpSearchType}`);
+  
   const result = await mcpClient.callTool('mfai_search', {
-    query,
-    search_type: strategy as 'text' | 'semantic',
+    query: cleanQuery,
+    search_type: mcpSearchType,
     repositories: [repo],
     max_results: searchParameters?.maxResults || 10,
   });
 
-  return JSON.parse(result.content[0].text);
+  try {
+    const parsed = JSON.parse(result.content[0].text);
+    
+    // Ensure we return an array
+    if (Array.isArray(parsed)) {
+      return parsed;
+    } else if (parsed && parsed.results && Array.isArray(parsed.results)) {
+      return parsed.results;
+    } else {
+      console.warn('Search result is not an array:', parsed);
+      return [];
+    }
+  } catch (error) {
+    console.error('Failed to parse search results:', error);
+    return [];
+  }
 }
 
 /**

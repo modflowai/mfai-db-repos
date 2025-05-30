@@ -160,7 +160,10 @@ export class WorkflowOrchestrator {
           sessionId: this.state.id,
           dataStream: this.dataStream,
           previousResults: context,
-          streamStatus: (status) => this.streamToolStatus(status)
+          streamStatus: (status) => this.streamToolStatus({
+            ...status,
+            tool: tool.name
+          })
         };
         
         // Execute tool

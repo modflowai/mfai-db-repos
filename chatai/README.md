@@ -1,10 +1,10 @@
 <a href="https://chat.vercel.ai/">
-  <img alt="Next.js 14 and App Router-ready AI chatbot." src="app/(chat)/opengraph-image.png">
-  <h1 align="center">Chat SDK</h1>
+  <img alt="Next.js 15 and App Router-ready AI chatbot with modular workflow architecture." src="app/(chat)/opengraph-image.png">
+  <h1 align="center">MODFLOW AI Chat SDK</h1>
 </a>
 
 <p align="center">
-    Chat SDK is a free, open-source template built with Next.js and the AI SDK that helps you quickly build powerful chatbot applications.
+    MODFLOW AI Chat SDK is a specialized AI chatbot template built with Next.js and the AI SDK, featuring modular workflow architecture for MODFLOW/PEST repository search and analysis.
 </p>
 
 <p align="center">
@@ -24,13 +24,18 @@
   - React Server Components (RSCs) and Server Actions for server-side rendering
   - Optimized for production deployment
 
-### 🤖 **AI-Powered**
+### 🤖 **AI-Powered with Modular Workflow Architecture**
 - **[AI SDK](https://sdk.vercel.ai/docs)** integration
   - Unified API for generating text, structured objects, and tool calls with LLMs
   - Hooks for building dynamic chat and generative user interfaces
   - Supports xAI (default), OpenAI, Anthropic, Fireworks, and other model providers
   - **Reasoning** capabilities with extractReasoningMiddleware
-  - **Tool usage** for enhanced functionality
+  - **Modular Workflow System** with streaming individual tools:
+    - **Relevance Checker** - AI-powered query relevance analysis
+    - **Query Analyzer** - Intelligent search strategy determination  
+    - **Repository Searcher** - Multi-repository search with MCP integration
+    - **Context-aware Repository Mapping** - Dynamic repository selection
+    - **Real-time Progress Updates** - Transparent tool execution with UI components
 
 ### 🎨 **Generative User Interfaces**
 - Go beyond text with interactive UI components in chat responses
@@ -95,6 +100,21 @@
 - **[Playwright](https://playwright.dev/)** E2E testing suite
 - Tests for chat flows, artifacts, authentication, and reasoning
 - CI/CD integration ready
+
+## MODFLOW/PEST Integration
+
+This specialized template includes integrated support for MODFLOW and PEST repository search through:
+
+### 🔗 **MCP (Model Context Protocol) Integration**
+- **Repository Search** - Direct integration with MODFLOW repositories
+- **Text & Semantic Search** - Advanced search strategies with PostgreSQL full-text search
+- **Real-time Results** - Streaming search results with relevance scoring
+- **Multi-repository Support** - Search across flopy, pest, mfusg, pestpp, and more
+
+### 🧠 **LLM-Powered Analysis** 
+- **Intent Analysis** - Determines optimal search strategy based on query context
+- **Relevance Scoring** - AI-powered ranking of search results
+- **Context-aware Mapping** - Intelligent repository selection based on query content
 
 ## Model Providers
 
@@ -231,8 +251,13 @@ BLOB_READ_WRITE_TOKEN=your-blob-token    # Vercel Blob storage
 UPSTASH_REDIS_REST_URL=your-upstash-url   # Upstash Redis for rate limiting
 UPSTASH_REDIS_REST_TOKEN=your-upstash-token
 
+# MODFLOW/PEST Integration (Required for repository search)
+MCP_SERVER_URL=your-mcp-server-url       # MCP server for repository access
+MCP_API_KEY=your-mcp-api-key             # API key for MCP authentication
+
 # Optional
 REDIS_URL=your-redis-url                 # For additional caching
+MODULAR_WORKFLOW_ENABLED=true            # Enable modular workflow system (default: true)
 ```
 
 **Database Providers:**

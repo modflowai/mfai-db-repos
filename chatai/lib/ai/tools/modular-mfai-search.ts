@@ -19,15 +19,27 @@ export const modularMfaiSearch = ({ session, dataStream }: ToolProps) =>
       query: z.string().describe('Your search query for MODFLOW/PEST content'),
     }),
     execute: async ({ query }) => {
+      // Stream immediate feedback
+      dataStream.writeData({
+        type: 'text-delta',
+        content: `🚀 **Starting MODFLOW Search**: "${query}"\n\n`,
+      });
+
       // Initialize workflow orchestrator
       const orchestrator = new WorkflowOrchestrator(dataStream, session?.user?.id || 'user-session');
 
-      // Execute the modular workflow
+      // Execute the modular workflow with streaming progress
       const workflowResult = await orchestrator.execute(
         query, 
         [], // conversation history
         []  // previous results
       );
+
+      // Stream completion
+      dataStream.writeData({
+        type: 'text-delta',
+        content: `✅ **Search Complete**: Found answer in ${(workflowResult.totalTime / 1000).toFixed(1)}s\n\n`,
+      });
 
       // Return structured result for the UI
       return {

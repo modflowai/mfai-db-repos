@@ -11,9 +11,31 @@ import {
 } from '../schemas/tool-schemas';
 
 /**
- * Analyze search strategy using LLM
+ * Get available repositories from context or fetch them
  */
-async function analyzeSearchStrategy(query: string, relevanceData: any): Promise<QueryAnalyzerOutput & { confidence: number }> {
+async function getAvailableRepositories(context: any): Promise<string[]> {
+  // Check if we have recent repository data in context
+  const conversationHistory = context.get?.('conversationHistory') || [];
+  const previousResults = context.get?.('previousResults') || [];
+  
+  // Look for recent listRepositories results in context
+  for (const result of [...conversationHistory, ...previousResults]) {
+    if (result?.repositories && Array.isArray(result.repositories)) {
+      return result.repositories.map((repo: any) => repo.name || repo);
+    }
+  }
+  
+  // Fallback to common repositories if no context available
+  return ["pest", "mfusg", "pest_hp", "flopy", "pestpp"];
+}
+
+/**
+ * Analyze search strategy using LLM with dynamic repository context
+ */
+async function analyzeSearchStrategy(query: string, relevanceData: any, context: any): Promise<QueryAnalyzerOutput & { confidence: number }> {
+  // Get available repositories dynamically
+  const availableRepos = await getAvailableRepositories(context);
+  
   const result = await generateText({
     model: myProvider.languageModel('chat-model'),
     messages: [
@@ -28,9 +50,10 @@ async function analyzeSearchStrategy(query: string, relevanceData: any): Promise
            - "hybrid": comprehensive searches needing both approaches
         
         2. targetRepositories: Focus on specific repos or search all
-           - Common repos: ["flopy", "modflow6", "pest", "mt3d", "seawat"]
+           - Available repos: ${JSON.stringify(availableRepos)}
            - Use [] for all repositories
            - For repository listing queries, use [] to list all
+           - Map user terms to actual repository names based on context
         
         3. searchType: Description of what we're looking for
            - "repository_listing" for queries asking for available repos
@@ -43,14 +66,20 @@ async function analyzeSearchStrategy(query: string, relevanceData: any): Promise
         Respond in JSON format:
         {
           "strategy": "semantic",
-          "repositories": ["flopy"],
+          "repositories": ["mfusg"],
           "searchType": "conceptual explanation",
-          "keywords": ["flopy", "modflow", "groundwater"],
+          "keywords": ["pump", "level", "cln", "modflowusg"],
           "expectedResultTypes": ["documentation", "examples"],
           "confidence": 0.85
         }
 
-        Examples:
+        Examples based on available repositories:
+        ${availableRepos.map(repo => `- Query mentioning "${repo}" → repositories: ["${repo}"]`).join('\n        ')}
+        
+        Common mappings (map user terms to actual repo names):
+        - "modflowusg", "modflow-usg", "usg", "cln" → look for repository with "usg" in name
+        - "pest", "parameter estimation" → look for repository with "pest" in name
+        - "flopy", "python" → look for repository with "flopy" in name
         - "repo list" → searchType: "repository_listing", repositories: [], strategy: "text"
         - "what repositories are available" → searchType: "repository_listing", repositories: []
         - "search flopy for wells" → searchType: "search", repositories: ["flopy"], strategy: "semantic"`
@@ -119,7 +148,7 @@ export const queryAnalyzer = createWorkflowTool({
     });
 
     try {
-      const analysis = await analyzeSearchStrategy(query, relevanceData);
+      const analysis = await analyzeSearchStrategy(query, relevanceData, context.previousResults);
       
       await context.streamStatus({
         phase: 'processing',

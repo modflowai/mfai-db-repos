@@ -100,9 +100,18 @@ export const intelligentMfaiSearch = ({ session, dataStream }: ToolProps) =>
             content: `🔍 Executing ${searchStrategy} search...\n\n`,
           });
 
+          // Convert strategy to MCP-compatible type
+          let mcpSearchType: 'text' | 'semantic';
+          if (searchStrategy === 'hybrid') {
+            // For hybrid, default to semantic search as it's more comprehensive
+            mcpSearchType = 'semantic';
+          } else {
+            mcpSearchType = searchStrategy as 'text' | 'semantic';
+          }
+
           const result = await mcpClient.callTool('mfai_search', {
             query,
-            search_type: searchStrategy as 'text' | 'semantic',
+            search_type: mcpSearchType,
             repositories: targetRepositories,
           });
 

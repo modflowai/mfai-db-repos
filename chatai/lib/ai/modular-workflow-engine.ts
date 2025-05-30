@@ -76,15 +76,25 @@ export const createModularWorkflow = (dataStream: DataStreamWriter) => {
     if (useModularWorkflow) {
       // Determine which tool to use based on intent
       if (intentAnalysis.shouldSearch) {
-        // Use modular search tool for actual searches
+        // Use individual workflow tools for step-by-step execution
         try {
+          console.log('🔍 Search request - using individual workflow tools');
+          console.log('🔍 Available tools for search:', Object.keys(tools));
+          console.log('🔍 Active tools specified:', ['relevanceChecker', 'queryAnalyzer', 'repositorySearcher']);
+          
           return streamText({
             model,
-            system: system + `\n\nThe user wants to search MODFLOW repositories. Use the modularMfaiSearch tool to execute a comprehensive search with streaming progress updates.`,
+            system: system + `\n\nIMPORTANT: The user is asking to search MODFLOW repositories. Execute this step-by-step workflow:
+
+1. FIRST: Use the relevanceChecker tool to verify the query is MODFLOW-related
+2. THEN: Use the queryAnalyzer tool to determine search strategy 
+3. FINALLY: Use the repositorySearcher tool to find relevant content
+
+Execute these tools in sequence. Each tool will show progress independently.`,
             messages,
-            maxSteps: 2,
+            maxSteps: 5,
             tools,
-            experimental_activeTools: ['modularMfaiSearch'],
+            experimental_activeTools: ['relevanceChecker', 'queryAnalyzer', 'repositorySearcher'],
             ...options
           });
         } catch (error) {
