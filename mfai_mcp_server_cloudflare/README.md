@@ -6,22 +6,18 @@ This is the Cloudflare Workers version of the MFAI Repository Navigator MCP serv
 
 - **Stateless Architecture**: Each request is independent, perfect for edge computing
 - **Direct JSON-RPC Handling**: Custom implementation for Cloudflare Workers compatibility
-- **SSE Support**: Server-Sent Events endpoint for Cursor IDE compatibility
+- **HTTP Transport**: Reliable HTTP-only transport via mcp-remote for VS Code/Cursor compatibility
+- **SSE Support**: Server-Sent Events endpoint also available (though HTTP transport is recommended)
 - **Multiple Authentication Strategies**: Bearer tokens, X-API-Key headers, and query parameters
 - **Global Distribution**: Runs on Cloudflare's edge network
 - **Automatic Scaling**: Handles load automatically
 - **Built-in Security**: Cloudflare's security features included
 
-## Cursor IDE Compatibility ✅
+## IDE Compatibility
 
-**Great news!** This server now supports multiple connection methods for Cursor IDE:
+### VS Code & Windsurf ✅
 
-1. **SSE Endpoint (Recommended)**: Direct connection using mcp-remote with Bearer token authentication
-2. **Local Proxy**: stdio bridge for environments that need it
-
-### Option 1: Direct SSE Connection (Recommended)
-
-Use `mcp-remote` to connect Cursor directly to the Cloudflare Worker:
+These IDEs work perfectly with direct HTTP transport:
 
 ```json
 {
@@ -31,39 +27,43 @@ Use `mcp-remote` to connect Cursor directly to the Cloudflare Worker:
       "args": [
         "-y",
         "mcp-remote@latest", 
-        "https://mfai-repository-navigator.little-grass-273a.workers.dev/sse",
+        "https://mfai-repository-navigator.little-grass-273a.workers.dev/mcp",
         "--header",
-        "Authorization:Bearer ${MCP_API_KEY}"
+        "Authorization:Bearer ${AUTH_HEADER}",
+        "--transport",
+        "http-only"
       ],
       "env": {
-        "MCP_API_KEY": "your_api_key_here"
+        "AUTH_HEADER": "your_api_key_here"
       }
     }
   }
 }
 ```
 
-**Status: ✅ Tested and Working** - This configuration has been validated with comprehensive testing.
+**Status: ✅ Tested and Working** - Direct HTTP transport provides the best performance and reliability.
 
-### Option 2: Local Proxy (Alternative)
+### Cursor IDE ⚠️
 
-If you prefer a local bridge:
+Cursor has known compatibility issues with mcp-remote. Use the included wrapper script:
 
 ```json
 {
   "mcpServers": {
-    "mfai-navigator": {
+    "mfai": {
       "command": "node",
-      "args": ["/absolute/path/to/proxy.js"],
+      "args": ["/absolute/path/to/cursor-mcp-wrapper.js"],
       "env": {
-        "MCP_API_KEY": "your_api_key_here"
+        "MFAI_API_KEY": "your_api_key_here"
       }
     }
   }
 }
 ```
 
-**Status: ✅ Tested and Working** - This is the configuration currently working for the user.
+**Status: ✅ Working with Wrapper** - The wrapper handles Cursor's compatibility issues while still using HTTP transport.
+
+**Note**: The wrapper script (`cursor-mcp-wrapper.js`) is included in this repository. It internally uses the same HTTP transport but works around Cursor-specific issues.
 
 ### Understanding the Difference
 
@@ -386,9 +386,12 @@ This repository includes comprehensive test scripts to validate both HTTP and SS
 
 ```bash
 # Basic test (no authentication - will show 401 errors)
-node test-sse-prod.js
+node test-prod.js
 
-# Authenticated test with working API key
+# Authenticated test with working API key  
+MCP_API_KEY=your_api_key_here node test-prod.js
+
+# Test SSE endpoint specifically
 MCP_API_KEY=your_api_key_here node test-sse-prod.js
 ```
 
@@ -437,36 +440,60 @@ curl -N -H "Accept: text/event-stream" \
 # ...
 ```
 
-## Using the Proxy Script for stdio Clients
+## Cursor IDE Wrapper Script
 
-Since many MCP clients (like Cursor) only support stdio transport, we include a `proxy.js` script that bridges stdio to our HTTP API.
+Due to known compatibility issues between Cursor and mcp-remote, we provide a wrapper script that enables Cursor to connect to the MCP server.
 
-### How it Works
+### How the Wrapper Works
 
-The proxy script:
-1. Reads JSON-RPC messages from stdin
-2. Forwards them to the Cloudflare Worker via HTTP POST
-3. Includes Bearer authentication if configured
-4. Returns responses to stdout
+The `cursor-mcp-wrapper.js` script:
+1. Reads the API key from the `MFAI_API_KEY` environment variable
+2. Spawns mcp-remote with the correct HTTP transport settings
+3. Handles process lifecycle and error management
+4. Passes through all stdio communication
 
-### Usage
+### Configuration
 
-```bash
-# Direct usage
-echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | MCP_API_KEY=your_key node proxy.js
+1. **Set up your Cursor MCP configuration** (usually in `~/.cursor/mcp.json` or through Cursor settings):
 
-# Or configure the server URL
-echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | MCP_API_KEY=your_key node proxy.js https://your-server.workers.dev/mcp
+```json
+{
+  "mcpServers": {
+    "mfai": {
+      "command": "node",
+      "args": ["/path/to/mfai_mcp_server_cloudflare/cursor-mcp-wrapper.js"],
+      "env": {
+        "MFAI_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
 ```
 
-### Configuration in Cursor
+2. **Optional environment variables**:
+   - `MFAI_API_KEY` (required): Your API key for authentication
+   - `MFAI_SERVER_URL` (optional): Override the default server URL
+   - `MFAI_DEBUG` (optional): Set to "true" for debug logging
+
+### Troubleshooting
+
+If the wrapper doesn't work:
+
+1. **Check Node.js is installed**: Run `node --version`
+2. **Check npm is available**: Run `npm --version`
+3. **Enable debug mode**: Set `MFAI_DEBUG=true` in the env section
+4. **Check the API key**: Ensure it's correctly set and valid
+
+### Alternative: Using proxy.js
+
+If you prefer, you can also use the simpler `proxy.js` script included in the repository:
 
 ```json
 {
   "mcpServers": {
     "mfai-navigator": {
       "command": "node",
-      "args": ["/absolute/path/to/proxy.js"],
+      "args": ["/path/to/proxy.js"],
       "env": {
         "MCP_API_KEY": "your_api_key_here"
       }
@@ -474,6 +501,8 @@ echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | MCP_API_KEY=your_key nod
   }
 }
 ```
+
+The main difference is that `cursor-mcp-wrapper.js` uses mcp-remote (providing full MCP protocol support), while `proxy.js` is a simpler stdio-to-HTTP bridge.
 
 ## Testing with MCP Inspector
 
@@ -608,7 +637,7 @@ Cursor currently only supports stdio transport, not direct HTTP connections. You
 }
 ```
 
-**Option 2: Use mcp-remote with SSE (Recommended)**
+**Option 2: Use mcp-remote with HTTP (Recommended)**
 ```json
 {
   "mcpServers": {
@@ -617,9 +646,11 @@ Cursor currently only supports stdio transport, not direct HTTP connections. You
       "args": [
         "-y",
         "mcp-remote@latest",
-        "https://mfai-repository-navigator.little-grass-273a.workers.dev/sse",
+        "https://mfai-repository-navigator.little-grass-273a.workers.dev/mcp",
         "--header",
-        "Authorization:Bearer ${MCP_API_KEY}"
+        "Authorization:Bearer ${MCP_API_KEY}",
+        "--transport",
+        "http-only"
       ],
       "env": {
         "MCP_API_KEY": "your_api_key_here"
@@ -629,7 +660,7 @@ Cursor currently only supports stdio transport, not direct HTTP connections. You
 }
 ```
 
-**Note**: This uses the new SSE endpoint which supports Bearer token authentication. **✅ Fully tested and working.**
+**Note**: This uses HTTP-only transport which provides the most reliable connection. **✅ Fully tested and working with VS Code and Cursor.**
 
 #### For Future HTTP-Compatible Clients
 

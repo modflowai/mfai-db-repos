@@ -51,8 +51,17 @@ function createServer(env: Env) {
 
   // Handle initialization
   const initHandler = async (request: any) => {
+    // Accept both protocol versions for compatibility
+    const clientProtocolVersion = request.params?.protocolVersion || '2024-11-05';
+    const supportedVersions = ['2024-11-05', '2025-03-26'];
+    
+    // Use the client's version if supported, otherwise default to 2024-11-05
+    const protocolVersion = supportedVersions.includes(clientProtocolVersion) 
+      ? clientProtocolVersion 
+      : '2024-11-05';
+    
     return {
-      protocolVersion: '2024-11-05',
+      protocolVersion,
       capabilities: {
         tools: {},
       },
@@ -383,18 +392,25 @@ async function handleJsonRpcRequest(server: Server, request: any) {
 // Authentication helper function - supports multiple auth strategies
 function authenticateRequest(request: Request, env: Env): boolean {
   if (!env.MCP_API_KEY) {
+    console.log('No MCP_API_KEY configured, authentication disabled');
     return true; // No authentication required
   }
 
+  console.log('MCP_API_KEY is configured, checking authentication...');
+
   // Strategy 1: Check Authorization header (standard Bearer token)
   const authHeader = request.headers.get('Authorization');
+  console.log('Authorization header:', authHeader);
+  console.log('Expected:', `Bearer ${env.MCP_API_KEY}`);
   if (authHeader === `Bearer ${env.MCP_API_KEY}`) {
+    console.log('Auth successful via Authorization header');
     return true;
   }
 
   // Strategy 2: Check X-API-Key header (alternative)
   const apiKeyHeader = request.headers.get('X-API-Key');
   if (apiKeyHeader === env.MCP_API_KEY) {
+    console.log('Auth successful via X-API-Key header');
     return true;
   }
 
@@ -402,9 +418,11 @@ function authenticateRequest(request: Request, env: Env): boolean {
   const url = new URL(request.url);
   const queryAuth = url.searchParams.get('auth');
   if (queryAuth === env.MCP_API_KEY) {
+    console.log('Auth successful via query parameter');
     return true;
   }
 
+  console.log('All authentication strategies failed');
   return false;
 }
 
@@ -413,6 +431,30 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     
+    // Dynamic client registration endpoint
+    if (request.method === 'POST' && url.pathname === '/register') {
+      console.log('Client registration request received');
+      
+      // For now, we'll accept any registration request
+      // In production, you might want to validate the request
+      const clientId = crypto.randomUUID();
+      
+      return new Response(JSON.stringify({
+        client_id: clientId,
+        client_id_issued_at: Math.floor(Date.now() / 1000),
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none',
+        // Add any other fields that mcp-remote expects
+      }), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+
     // SSE endpoint for MCP-remote compatibility
     if (request.method === 'GET' && url.pathname === '/sse') {
       // Authenticate request
@@ -428,11 +470,11 @@ export default {
 
       // Create SSE stream with ReadableStream
       const encoder = new TextEncoder();
-      const messagesUrl = `${url.origin}/messages`;
+      const messagesUrl = `${url.origin}/sse/messages`;
       
       const stream = new ReadableStream({
         start(controller) {
-          // Send endpoint event per MCP SSE specification
+          // Send endpoint event with the SSE messages endpoint
           controller.enqueue(encoder.encode(`event: endpoint\ndata: ${messagesUrl}\n\n`));
           
           // Keep connection alive with ping messages
@@ -468,10 +510,13 @@ export default {
       });
     }
 
-    // Messages endpoint for SSE - forwards to existing MCP logic
-    if (request.method === 'POST' && url.pathname === '/messages') {
+    // SSE messages endpoint - handles client-to-server messages for SSE transport
+    if (request.method === 'POST' && url.pathname === '/sse/messages') {
+      console.log('SSE messages endpoint hit, headers:', Object.fromEntries(request.headers.entries()));
+      
       // Authenticate request
       if (!authenticateRequest(request, env)) {
+        console.log('Authentication failed');
         return new Response(JSON.stringify({
           jsonrpc: '2.0',
           error: {
@@ -484,9 +529,12 @@ export default {
           headers: { 
             'Content-Type': 'application/json',
             'WWW-Authenticate': 'Bearer realm="MCP API"',
+            'Access-Control-Allow-Origin': '*',
           },
         });
       }
+
+      console.log('Authentication successful');
 
       try {
         // Parse the request body
@@ -498,12 +546,14 @@ export default {
         
         // Handle the JSON-RPC request
         const response = await handleJsonRpcRequest(server, body);
+        console.log('Sending response:', JSON.stringify(response));
         
         return new Response(JSON.stringify(response), {
           status: 200,
           headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Authorization, X-API-Key, Content-Type',
           },
         });
       } catch (error) {
@@ -525,14 +575,79 @@ export default {
       }
     }
 
-    // Handle OPTIONS requests for CORS
+    // Messages endpoint for SSE - forwards to existing MCP logic
+    if (request.method === 'POST' && url.pathname === '/messages') {
+      console.log('Messages endpoint hit, headers:', Object.fromEntries(request.headers.entries()));
+      
+      // Authenticate request
+      if (!authenticateRequest(request, env)) {
+        console.log('Authentication failed');
+        return new Response(JSON.stringify({
+          jsonrpc: '2.0',
+          error: {
+            code: -32001,
+            message: 'Unauthorized - Invalid or missing API key',
+          },
+          id: null,
+        }), {
+          status: 401,
+          headers: { 
+            'Content-Type': 'application/json',
+            'WWW-Authenticate': 'Bearer realm="MCP API"',
+            'Access-Control-Allow-Origin': '*',
+          },
+        });
+      }
+
+      console.log('Authentication successful');
+
+      try {
+        // Parse the request body
+        const body = await request.json();
+        console.log('Received SSE message request:', JSON.stringify(body));
+        
+        // Create server instance
+        const server = createServer(env);
+        
+        // Handle the JSON-RPC request
+        const response = await handleJsonRpcRequest(server, body);
+        console.log('Sending response:', JSON.stringify(response));
+        
+        return new Response(JSON.stringify(response), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Authorization, X-API-Key, Content-Type',
+          },
+        });
+      } catch (error) {
+        console.error('Error handling SSE message request:', error);
+        return new Response(JSON.stringify({
+          jsonrpc: '2.0',
+          error: {
+            code: -32603,
+            message: `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+          id: null,
+        }), {
+          status: 500,
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        });
+      }
+    }
+
+    // Handle OPTIONS requests for CORS (handle early for all paths)
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 200,
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Authorization, X-API-Key, Content-Type',
+          'Access-Control-Allow-Headers': 'Authorization, X-API-Key, Content-Type, Accept, Accept-Encoding, Accept-Language',
           'Access-Control-Max-Age': '86400',
         },
       });
@@ -618,6 +733,7 @@ export default {
           mcp: '/mcp',
           sse: '/sse',
           messages: '/messages',
+          register: '/register',
         },
         authentication: env.MCP_API_KEY ? 'required' : 'disabled',
         sseSupport: true,
