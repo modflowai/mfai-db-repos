@@ -1,6 +1,6 @@
 {
   "name": "@modflowai/mcp-server",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "Cursor IDE wrapper for MFAI Repository Navigator MCP server",
   "main": "index.js",
   "bin": {

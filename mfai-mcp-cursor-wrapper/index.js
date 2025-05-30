@@ -23,6 +23,8 @@
  */
 
 import { spawn } from 'child_process';
+import { platform } from 'os';
+import { existsSync } from 'fs';
 
 // Configuration
 const SERVER_URL = process.env.MFAI_SERVER_URL || 'https://mfai-repository-navigator.little-grass-273a.workers.dev/mcp';
@@ -53,7 +55,7 @@ const args = [
   'mcp-remote@latest',
   SERVER_URL,
   '--header',
-  `Authorization:Bearer ${API_KEY}`,
+  `"Authorization:Bearer ${API_KEY}"`,
   '--transport',
   'http-only'
 ];
@@ -64,15 +66,53 @@ if (process.env.MFAI_DEBUG === 'true') {
   console.error(`[DEBUG] API Key: ${API_KEY.substring(0, 8)}...`);
 }
 
+// Determine npx command based on platform
+function getNpxCommand() {
+  if (platform() === 'win32') {
+    // Try common Windows npx locations
+    const paths = [
+      'C:\\Program Files\\nodejs\\npx.cmd',
+      'C:\\Users\\' + (process.env.USERNAME || 'user') + '\\AppData\\Roaming\\npm\\npx.cmd',
+      'npx.cmd',
+      'npx'
+    ];
+    
+    for (const path of paths) {
+      if (existsSync(path)) {
+        // Quote paths with spaces for shell execution
+        return path.includes(' ') ? `"${path}"` : path;
+      }
+    }
+    
+    // Fallback to npx if nothing found
+    return 'npx';
+  }
+  
+  return 'npx';
+}
+
+const npxCommand = getNpxCommand();
+
+if (process.env.MFAI_DEBUG === 'true') {
+  console.error(`[DEBUG] Using npx command: ${npxCommand}`);
+}
+
 // Spawn mcp-remote
-const child = spawn('npx', args, {
+const spawnOptions = {
   stdio: 'inherit',
   env: {
     ...process.env,
     // Ensure npx uses the correct npm registry
     npm_config_registry: 'https://registry.npmjs.org/'
   }
-});
+};
+
+// On Windows, we need to set shell: true for .cmd files
+if (platform() === 'win32') {
+  spawnOptions.shell = true;
+}
+
+const child = spawn(npxCommand, args, spawnOptions);
 
 // Handle errors
 child.on('error', (error) => {
