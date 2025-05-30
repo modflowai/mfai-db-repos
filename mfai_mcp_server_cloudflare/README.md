@@ -52,7 +52,7 @@ Cursor has known compatibility issues with mcp-remote. Use our npm wrapper packa
   "mcpServers": {
     "mfai": {
       "command": "npx",
-      "args": ["-y", "@modflowai/mcp-cursor-wrapper"],
+      "args": ["-y", "@modflowai/mcp-server"],
       "env": {
         "MFAI_API_KEY": "your_api_key_here"
       }
@@ -63,7 +63,7 @@ Cursor has known compatibility issues with mcp-remote. Use our npm wrapper packa
 
 **Status: ✅ Working with Wrapper** - The wrapper handles Cursor's compatibility issues while still using HTTP transport.
 
-**Note**: The wrapper is available as an npm package (`@modflowai/mcp-cursor-wrapper`) for easy installation. Alternatively, you can use the local `cursor-mcp-wrapper.js` script included in this repository.
+**Note**: The wrapper is available as an npm package (`@modflowai/mcp-server`) for easy installation. Alternatively, you can use the local `cursor-mcp-wrapper.js` script included in this repository.
 
 ### Understanding the Difference
 
@@ -461,7 +461,7 @@ The `cursor-mcp-wrapper.js` script:
   "mcpServers": {
     "mfai": {
       "command": "npx",
-      "args": ["-y", "@modflowai/mcp-cursor-wrapper"],
+      "args": ["-y", "@modflowai/mcp-server"],
       "env": {
         "MFAI_API_KEY": "your_api_key_here"
       }

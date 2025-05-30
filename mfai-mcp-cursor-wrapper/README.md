@@ -1,4 +1,4 @@
-# @modflowai/mcp-cursor-wrapper
+# @modflowai/mcp-server
 
 A wrapper that enables Cursor IDE to connect to the MFAI Repository Navigator MCP server using HTTP transport. This package works around known compatibility issues between Cursor and mcp-remote.
 
@@ -15,7 +15,7 @@ Add this configuration to your Cursor MCP settings (usually in `~/.cursor/mcp.js
   "mcpServers": {
     "mfai": {
       "command": "npx",
-      "args": ["-y", "@modflowai/mcp-cursor-wrapper"],
+      "args": ["-y", "@modflowai/mcp-server"],
       "env": {
         "MFAI_API_KEY": "your_api_key_here"
       }
@@ -42,7 +42,7 @@ Add this configuration to your Cursor MCP settings (usually in `~/.cursor/mcp.js
   "mcpServers": {
     "mfai": {
       "command": "npx",
-      "args": ["-y", "@modflowai/mcp-cursor-wrapper"],
+      "args": ["-y", "@modflowai/mcp-server"],
       "env": {
         "MFAI_API_KEY": "your_api_key_here",
         "MFAI_SERVER_URL": "https://your-custom-server.workers.dev/mcp"
