@@ -1,0 +1,48 @@
+{
+  "name": "mfai-intelligent-response",
+  "version": "1.0.0",
+  "description": "Intelligent MCP server that processes large repository documents and generates focused responses using Gemini",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/danilopezmella/mfai-intelligent-response.git"
+  },
+  "keywords": [
+    "mcp",
+    "intelligent",
+    "response",
+    "gemini",
+    "document-processing",
+    "groundwater",
+    "modflow"
+  ],
+  "license": "MIT",
+  "bin": {
+    "mfai-intelligent-response": "./build/index.js"
+  },
+  "main": "./build/index.js",
+  "files": [
+    "build",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "prepare": "npm run build",
+    "watch": "tsc --watch",
+    "dev": "npm run build && node build/index.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@neondatabase/serverless": "^1.0.0",
+    "dotenv": "^16.5.0",
+    "openai": "^4.100.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.9",
+    "typescript": "^5.7.2"
+  }
+}

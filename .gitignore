@@ -66,3 +66,5 @@ chatai/build/
 tests/mcp_aisdk/node_modules/
 mfai_mcp_server_reposel/node_modules/
 mfai_mcp_server_reposel/build/
+mfai_mcp_server_response/node_modules/
+mfai_mcp_server_response/build/

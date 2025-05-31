@@ -2,11 +2,11 @@
 
 ## Project Overview
 
-Create a **NEW MCP server** (`mfai_mcp_server_response`) that processes large repository documents (35k+ tokens) and generates focused intelligent responses (8k tokens). This server works **alongside** the existing `mfai_mcp_server` by taking a repository name, search method, and query, then using Gemini 2.5 to compress and synthesize the most relevant document into actionable information.
+Create a **NEW MCP server** (`mfai_mcp_server_response`) that retrieves repository documents and provides them in optimal format for LLM consumption. For documents under 8k tokens, it returns the full content. For larger documents (35k+ tokens), it uses Gemini 2.5 to intelligently compress while prioritizing query-relevant content to exactly 8k tokens. This server works **alongside** the existing `mfai_mcp_server` by taking a repository name, search method, and query, then providing the best document content for LLM context.
 
 ## 🎯 Architecture Principle: No Hardcoding
 
-**CORE PRINCIPLE**: The client decides the repository and search strategy. We focus on document processing + intelligent compression (35k+ docs → 8k focused responses).
+**CORE PRINCIPLE**: The client decides the repository and search strategy. We focus on document retrieval + intelligent content optimization (full docs under 8k, query-focused compression to 8k for larger docs).
 
 ## 🏗️ Clean Architecture Flow
 
@@ -14,18 +14,21 @@ Create a **NEW MCP server** (`mfai_mcp_server_response`) that processes large re
 CLIENT WORKFLOW:
 1. Client calls existing server: list_repositories_with_navigation → gets repo info
 2. Client decides: which repo + search method (text/semantic)  
-3. Client calls NEW server: mfai_intelligent_response
-   Input: {repository: "pestpp", search_type: "text", query: "What is PEST-IES?"}
+3. Client calls NEW server: mfai_document_retrieval
+   Input: {repository: "pestpp", search_type: "text", query: "PEST-IES iterative ensemble smoother"}
                           ↓
-              Document Retrieval → TOP search result (35k+ tokens)
+              Document Retrieval → TOP search result
                           ↓  
-              Gemini Document Processing (35k+ → 8k synthesis)
+              Intelligent Processing:
+              - If < 8k tokens → Return full document content (no processing)
+              - If ≥ 8k tokens → Query-focused compression to exactly 8k tokens
                           ↓
-Output: {response: "Focused 8k answer about PEST-IES...", sources: ["pestpp/methodology.md"]}
+Output: {content: "Full doc OR query-focused compressed 8k content", sources: ["pestpp/methodology.md"], token_count: 7850, was_compressed: true}
 
 SCENARIOS:
-A) Search finds document → Process 35k+ doc → Generate 8k focused response
-B) No search results → Use navigation guide → Suggest better query/approach
+A) Small document (< 8k) → Return full content as-is (no processing needed)
+B) Large document (≥ 8k) → Intelligent compression prioritizing query-relevant content
+C) No search results → Use navigation guide → Suggest better search approach
 ```
 
 ## 📁 New Project Structure
@@ -36,12 +39,13 @@ mfai_mcp_server_response/
 │   ├── index.ts                     # New MCP server entry point
 │   └── lib/
 │       ├── ai/
-│       │   └── prompts.ts           # Prompt management  
+│       │   └── prompts.ts           # Document compression prompts  
 │       ├── services/
 │       │   ├── document-search-service.ts    # Reuse existing search logic
-│       │   └── gemini-response-service.ts    # AI response generation
+│       │   ├── gemini-intelligence-service.ts # AI query-focused processing
+│       │   └── token-counter-service.ts      # Token counting utility
 │       ├── handlers/
-│       │   └── intelligent-response-handler.ts # Main handler
+│       │   └── document-retrieval-handler.ts # Main retrieval handler
 │       └── types/
 │           └── response-types.ts     # Clean interfaces
 ├── package.json
@@ -56,14 +60,14 @@ mfai_mcp_server_response/
 **File:** `src/index.ts`
 ```typescript
 {
-  name: 'mfai_intelligent_response',
-  description: 'Generates intelligent response for repository query. Client provides repo and search strategy.',
+  name: 'mfai_document_retrieval',
+  description: 'Retrieves repository documents in optimal format for LLM consumption. Returns full content for small docs, intelligently compressed content for large docs.',
   inputSchema: {
     type: 'object',
     properties: {
       query: {
         type: 'string',
-        description: 'User question about the repository',
+        description: 'Search query to find relevant document',
       },
       repository: {
         type: 'string', 
@@ -83,16 +87,18 @@ mfai_mcp_server_response/
 #### 1.2 Clean Interfaces  
 **File:** `src/lib/types/response-types.ts`
 ```typescript
-export interface IntelligentResponseInput {
+export interface DocumentRetrievalInput {
   query: string;
   repository: string;
   search_type: 'text' | 'semantic';
 }
 
-export interface IntelligentResponseOutput {
-  response: string;
-  sources: string[];  // Simple document titles
-  follow_up_suggestions: string[];
+export interface DocumentRetrievalOutput {
+  content: string;           // Full document or compressed 8k content
+  sources: string[];         // Simple document titles  
+  token_count: number;       // Actual token count of returned content
+  was_compressed: boolean;   // True if content was compressed by Gemini
+  original_token_count?: number; // Original size if compressed
 }
 
 export interface DocumentSearchResult {
@@ -187,15 +193,31 @@ export class DocumentSearchService {
 }
 ```
 
-### Phase 3: Gemini Response Service (Reuse JSON Approach)
+### Phase 3: Token Counter & Gemini Compression Services
 
-**File:** `src/lib/services/gemini-response-service.ts`  
+**File:** `src/lib/services/token-counter-service.ts`
+```typescript
+export class TokenCounterService {
+  private static readonly CHARS_PER_TOKEN = 4; // Rough estimate for English text
+  
+  static countTokens(text: string): number {
+    // Simple token estimation: 1 token ≈ 4 characters for English
+    return Math.ceil(text.length / this.CHARS_PER_TOKEN);
+  }
+  
+  static isUnder8k(text: string): boolean {
+    return this.countTokens(text) < 8000;
+  }
+}
+```
+
+**File:** `src/lib/services/gemini-compression-service.ts`  
 ```typescript
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { IntelligentResponsePrompts } from '../ai/prompts.js';
-import type { DocumentSearchResult, IntelligentResponseOutput } from '../types/response-types.js';
+import { DocumentCompressionPrompts } from '../ai/prompts.js';
+import type { DocumentSearchResult } from '../types/response-types.js';
 
-export class GeminiResponseService {
+export class GeminiCompressionService {
   private genai: GoogleGenerativeAI;
   private model: any;
 
@@ -204,106 +226,143 @@ export class GeminiResponseService {
     this.model = this.genai.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
   }
 
-  async generateResponse(
-    query: string,
+  async compressDocument(
+    document: DocumentSearchResult,
     repository: string,
-    topDocument: DocumentSearchResult | null,
-    navigationGuide: string
-  ): Promise<IntelligentResponseOutput> {
+    originalTokenCount: number
+  ): Promise<string> {
     
     try {
-      const prompt = IntelligentResponsePrompts.buildResponsePrompt(
-        query, 
-        repository, 
-        topDocument,
-        navigationGuide
+      const prompt = DocumentCompressionPrompts.buildCompressionPrompt(
+        document,
+        repository,
+        originalTokenCount
       );
       
       const result = await this.model.generateContent({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 8000,  // 8k focused response limit
-          responseMimeType: 'application/json',
-          responseSchema: IntelligentResponsePrompts.getResponseSchema()
+          temperature: 0.1,        // Low temperature for consistent compression
+          maxOutputTokens: 8000,   // Exactly 8k tokens
         },
       });
 
-      const response = result.response.text();
-      return JSON.parse(response);
+      return result.response.text();
       
     } catch (error) {
-      console.error('Gemini Response Generation Error:', error);
-      throw new Error(`Failed to generate intelligent response: ${error.message}`);
+      console.error('Gemini Document Compression Error:', error);
+      throw new Error(`Failed to compress document: ${error.message}`);
     }
   }
 }
 ```
 
-### Phase 4: Simple Handler & Integration
+### Phase 4: Document Retrieval Handler & Integration
 
-**File:** `src/lib/handlers/intelligent-response-handler.ts`
+**File:** `src/lib/handlers/document-retrieval-handler.ts`
 ```typescript
 import { DocumentSearchService } from '../services/document-search-service.js';
-import { GeminiResponseService } from '../services/gemini-response-service.js';
-import type { IntelligentResponseInput, IntelligentResponseOutput } from '../types/response-types.js';
+import { GeminiCompressionService } from '../services/gemini-compression-service.js';
+import { TokenCounterService } from '../services/token-counter-service.js';
+import type { DocumentRetrievalInput, DocumentRetrievalOutput } from '../types/response-types.js';
 
-export class IntelligentResponseHandler {
+export class DocumentRetrievalHandler {
   private searchService: DocumentSearchService;
-  private responseService: GeminiResponseService;
+  private compressionService: GeminiCompressionService;
+  private sql: any;
 
   constructor(
     searchService: DocumentSearchService,
-    responseService: GeminiResponseService
+    compressionService: GeminiCompressionService,
+    sqlConnection: any
   ) {
     this.searchService = searchService;
-    this.responseService = responseService;
+    this.compressionService = compressionService;
+    this.sql = sqlConnection;
   }
 
-  async handle(input: IntelligentResponseInput): Promise<IntelligentResponseOutput> {
+  async handle(input: DocumentRetrievalInput): Promise<DocumentRetrievalOutput> {
     try {
-      // 1. Get repository navigation guide
-      const navigationGuide = await this.getNavigationGuide(input.repository);
-      
-      // 2. Search for top document (35k+ tokens or null)
+      // 1. Search for top document
       const topDocument = await this.searchService.searchDocuments(
         input.repository,
         input.query,
         input.search_type
       );
       
-      // 3. Generate intelligent response (compress 35k+ → 8k response)
-      const response = await this.responseService.generateResponse(
-        input.query,
-        input.repository,
-        topDocument,
-        navigationGuide
-      );
+      if (!topDocument) {
+        // No document found - return navigation guide suggestion
+        const navigationGuide = await this.getNavigationGuide(input.repository);
+        return {
+          content: navigationGuide || `No documents found for query "${input.query}" in repository "${input.repository}". Try broader search terms.`,
+          sources: ['Navigation Guide'],
+          token_count: TokenCounterService.countTokens(navigationGuide || ''),
+          was_compressed: false
+        };
+      }
       
-      return response;
+      // 2. Check token count and decide on compression
+      const originalTokenCount = TokenCounterService.countTokens(topDocument.content);
+      
+      if (TokenCounterService.isUnder8k(topDocument.content)) {
+        // Return full document - no compression needed
+        return {
+          content: topDocument.content,
+          sources: [topDocument.filename],
+          token_count: originalTokenCount,
+          was_compressed: false
+        };
+      } else {
+        // Compress document to exactly 8k tokens
+        const compressedContent = await this.compressionService.compressDocument(
+          topDocument,
+          input.repository,
+          originalTokenCount
+        );
+        
+        const finalTokenCount = TokenCounterService.countTokens(compressedContent);
+        
+        return {
+          content: compressedContent,
+          sources: [topDocument.filename],
+          token_count: finalTokenCount,
+          was_compressed: true,
+          original_token_count: originalTokenCount
+        };
+      }
       
     } catch (error) {
-      console.error('Intelligent Response Handler Error:', error);
-      throw new Error(`Failed to generate intelligent response: ${error.message}`);
+      console.error('Document Retrieval Handler Error:', error);
+      throw new Error(`Failed to retrieve document: ${error.message}`);
     }
   }
 
   private async getNavigationGuide(repository: string): Promise<string> {
-    // Get navigation guide from database for repository context
-    // Implementation details...
-    return "";
+    try {
+      const results = await this.sql`
+        SELECT metadata->>'navigation_guide' as navigation_guide
+        FROM repositories
+        WHERE name = ${repository}
+        LIMIT 1
+      `;
+      
+      return results.length > 0 ? results[0].navigation_guide || '' : '';
+    } catch (error) {
+      console.error('Error fetching navigation guide:', error);
+      return '';
+    }
   }
 
   static getToolDefinition() {
     return {
-      name: 'mfai_intelligent_response',
-      description: 'Generates intelligent response for repository query. Client provides repo and search strategy.',
+      name: 'mfai_document_retrieval',
+      description: 'Retrieves repository documents in optimal format for LLM consumption. Returns full content for small docs, intelligently compressed content for large docs.',
       inputSchema: {
         type: 'object',
         properties: {
           query: {
             type: 'string',
-            description: 'User question about the repository',
+            description: 'Search query to find relevant document',
           },
           repository: {
             type: 'string',
@@ -341,33 +400,43 @@ export class IntelligentResponseHandler {
 
 ## 🚀 Expected Client Workflow
 
-### Example: Technical Query (Document Found)
+### Example: Large Document (Compression Required)
 ```
 1. Client: list_repositories_with_navigation → gets repo options
 2. Client decides: "pestpp" repo, "text" search for "PEST-IES"  
-3. Client: mfai_intelligent_response
-   Input: {repository: "pestpp", search_type: "text", query: "What is PEST-IES?"}
+3. Client: mfai_document_retrieval
+   Input: {repository: "pestpp", search_type: "text", query: "PEST-IES"}
 4. Server: finds 35k+ token document about PESTPP-IES methodology
-5. Server: Gemini processes 35k+ doc → generates focused 8k response
-6. Output: {response: "PEST-IES (Iterative Ensemble Smoother) is...", sources: ["pestpp/methodology.md"]}
+5. Server: Token count = 35,000 → Compression needed
+6. Server: Gemini compresses 35k doc → exactly 8k dense content
+7. Output: {content: "Compressed 8k content...", sources: ["pestpp/methodology.md"], token_count: 7998, was_compressed: true, original_token_count: 35000}
+```
+
+### Example: Small Document (Full Content)
+```
+1. Client: mfai_document_retrieval
+   Input: {repository: "flopy", search_type: "text", query: "installation guide"}
+2. Server: finds 3k token installation document
+3. Server: Token count = 3,000 → Return full content
+4. Output: {content: "Full 3k installation guide...", sources: ["flopy/installation.md"], token_count: 3000, was_compressed: false}
 ```
 
 ### Example: No Document Found
 ```
-1. Client: mfai_intelligent_response
+1. Client: mfai_document_retrieval
    Input: {repository: "flopy", search_type: "text", query: "PEST-IES implementation"}
 2. Server: no documents found matching query
-3. Server: uses navigation guide + repository knowledge  
-4. Output: {response: "PEST-IES is not available in FloPy. FloPy focuses on MODFLOW...", sources: ["Repository Navigation Guide"]}
+3. Server: returns navigation guide + suggestion  
+4. Output: {content: "FloPy navigation guide + search suggestions...", sources: ["Navigation Guide"], token_count: 1500, was_compressed: false}
 ```
 
 ## 📊 Success Criteria
 
 ### Functional Requirements ✅
-- Process large documents (35k+ tokens) into focused responses (8k tokens)
-- Generate comprehensive, contextual answers from document analysis
+- Return full content for documents under 8k tokens
+- Compress large documents (35k+ tokens) to exactly 8k tokens maintaining maximum information density
 - Handle both "document found" and "no results" scenarios gracefully
-- Provide accurate source attribution as simple document titles
+- Provide accurate source attribution and token count metrics
 - Support both text and semantic search (client decides)
 
 ### Architecture Requirements ✅
@@ -377,19 +446,20 @@ export class IntelligentResponseHandler {
 - Client manages repository selection and search strategy
 
 ### Quality Requirements ✅
-- Response time under 10 seconds for large document processing
-- Response accuracy >90% based on document content analysis
+- Response time under 10 seconds for large document compression
+- Compression maintains >90% of original information density
 - Proper error handling and graceful degradation
-- Source references are accurate document titles
-- Efficient token usage (35k+ input → 8k focused output)
+- Accurate token counting and compression metrics
+- Efficient processing (instant return for small docs, intelligent compression for large docs)
 
 ## 🎯 **Core Value Proposition**
 
-This MCP server solves the **"large document problem"** by acting as an intelligent document processor:
+This MCP server solves the **"document size optimization problem"** by acting as an intelligent document retrieval system:
 
-- **Input**: 35k+ token repository documents (too large for normal consumption)
-- **Process**: AI-powered analysis, extraction, and synthesis 
-- **Output**: 8k token focused responses with actionable information
-- **Result**: Users get comprehensive answers without reading massive documents
+- **Small Documents (< 8k)**: Return full content immediately - no processing needed
+- **Large Documents (≥ 8k)**: Intelligent compression maintaining maximum information density in exactly 8k tokens
+- **Process**: AI-powered content compression preserving all critical information
+- **Output**: LLM-optimized content ready for immediate consumption
+- **Result**: Clients get the best possible document content regardless of original size
 
-The architecture eliminates hardcoding, reuses proven infrastructure, and provides clean separation of concerns between repository navigation and intelligent document processing.
+The architecture eliminates hardcoding, reuses proven infrastructure, and provides clean separation of concerns between repository search and intelligent document optimization.
