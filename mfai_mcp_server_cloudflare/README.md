@@ -60,12 +60,23 @@ These IDEs have Windows compatibility issues with mcp-remote npx path resolution
 
 **Status: ✅ Working with Wrapper** - The wrapper handles Windows npx path issues while still using HTTP transport and Bearer authentication.
 
+### Claude Code ✅ (Direct HTTP)
+
+Claude Code works perfectly with direct HTTP transport. Add it using the CLI:
+
+```bash
+claude mcp add-json mfai '{"command": "npx", "args": ["-y", "mcp-remote@latest", "https://mfai-repository-navigator.little-grass-273a.workers.dev/mcp", "--header", "Authorization:Bearer your_api_key_here", "--transport", "http-only"]}'
+```
+
+**Status: ✅ Tested and Working** - Replace `your_api_key_here` with your actual API key.
+
 ## IDE Configuration Summary
 
 | IDE | Method | Configuration |
 |-----|--------|---------------|
 | **VS Code** | Direct HTTP | Use `mcp-remote` with `--transport http-only` |
 | **Windsurf** | Direct HTTP | Use `mcp-remote` with `--transport http-only` |
+| **Claude Code** | Direct HTTP | Use `claude mcp add-json` command |
 | **Cursor** | Wrapper | Use `@modflowai/mcp-server` wrapper |
 | **Claude Desktop** | Wrapper | Use `@modflowai/mcp-server` wrapper |
 

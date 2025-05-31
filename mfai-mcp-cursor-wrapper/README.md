@@ -58,12 +58,22 @@ You don't need to install this package separately. It can be run directly using 
 }
 ```
 
+### Claude Code (Direct HTTP - No Wrapper Needed)
+
+**Add using Claude Code CLI:**
+```bash
+claude mcp add-json mfai '{"command": "npx", "args": ["-y", "mcp-remote@latest", "https://mfai-repository-navigator.little-grass-273a.workers.dev/mcp", "--header", "Authorization:Bearer your_api_key_here", "--transport", "http-only"]}'
+```
+
+Replace `your_api_key_here` with your actual API key.
+
 ## Compatibility Matrix
 
 | IDE | Method | Status | Notes |
 |-----|--------|--------|-------|
 | **Cursor** | Wrapper | ✅ Working | Requires wrapper for Windows npx compatibility |
 | **Claude Desktop** | Wrapper | ✅ Working | Requires wrapper for Windows npx compatibility |
+| **Claude Code** | Direct HTTP | ✅ Working | Use `claude mcp add-json` command |
 | **VS Code** | Direct HTTP | ✅ Working | Native mcp-remote support |
 | **Windsurf** | Direct HTTP | ✅ Working | Native mcp-remote support |
 
